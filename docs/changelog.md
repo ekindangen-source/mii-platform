@@ -3,15 +3,13 @@
 ## v0.5
 
 ### Backend
-
-- PostgreSQL deployed to Amazon RDS
+- PostgreSQL on Amazon RDS
 - Node.js REST API
 - JWT Authentication
-- Modular routes
-- HTTPS enabled
+- Nginx reverse proxy
+- HTTPS
 
 ### Frontend
-
 - React
 - Material UI
 - Dashboard
@@ -20,10 +18,3 @@
 - Engines
 - Trips
 - Maintenance
-
-### Infrastructure
-
-- AWS EC2
-- Nginx
-- GitHub
-- HTTPS
