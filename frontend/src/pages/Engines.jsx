@@ -10,6 +10,7 @@ import {
   DialogTitle,
   IconButton,
   InputAdornment,
+  Menu,
   MenuItem,
   Paper,
   Stack,
@@ -18,7 +19,9 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
+  TableSortLabel,
   TextField,
   Tooltip,
   Typography,
@@ -27,6 +30,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -67,8 +71,19 @@ const fuelTypes = [
   "Hybrid",
 ];
 
+const sortableColumns = [
+  { id: "engine_id", label: "Engine ID" },
+  { id: "engine_name", label: "Engine" },
+  { id: "vessel_name", label: "Vessel" },
+  { id: "hp", label: "HP", numeric: true },
+  { id: "engine_hours", label: "Hours", numeric: true },
+];
+
 function formatDate(value) {
-  if (!value) return "";
+  if (!value) {
+    return "";
+  }
+
   return String(value).slice(0, 10);
 }
 
@@ -89,10 +104,31 @@ function mapRowToForm(row) {
   };
 }
 
+function compareValues(left, right, numeric = false) {
+  if (numeric) {
+    return Number(left ?? 0) - Number(right ?? 0);
+  }
+
+  return String(left ?? "").localeCompare(
+    String(right ?? ""),
+    undefined,
+    {
+      numeric: true,
+      sensitivity: "base",
+    }
+  );
+}
+
 export default function Engines() {
   const [engines, setEngines] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [search, setSearch] = useState("");
+
+  const [orderBy, setOrderBy] = useState("engine_name");
+  const [order, setOrder] = useState("asc");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -104,15 +140,19 @@ export default function Engines() {
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [actionAnchor, setActionAnchor] = useState(null);
+  const [actionEngine, setActionEngine] = useState(null);
+
   async function loadData() {
     try {
       setLoading(true);
       setError("");
 
-      const [enginesResponse, vesselsResponse] = await Promise.all([
-        api.get("/engines"),
-        api.get("/vessels"),
-      ]);
+      const [enginesResponse, vesselsResponse] =
+        await Promise.all([
+          api.get("/engines"),
+          api.get("/vessels"),
+        ]);
 
       if (!Array.isArray(enginesResponse.data)) {
         throw new Error("Unexpected engines response");
@@ -139,6 +179,10 @@ export default function Engines() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    setPage(0);
+  }, [search, rowsPerPage]);
+
   const vesselNameById = useMemo(() => {
     const map = new Map();
 
@@ -152,28 +196,79 @@ export default function Engines() {
     return map;
   }, [vessels]);
 
+  const enrichedEngines = useMemo(
+    () =>
+      engines.map((engine) => ({
+        ...engine,
+        engine_name:
+          [engine.brand, engine.model]
+            .filter(Boolean)
+            .join(" ") || "Unnamed engine",
+        vessel_name:
+          engine.boat_name ||
+          vesselNameById.get(engine.vessel_id) ||
+          engine.vessel_id ||
+          "",
+      })),
+    [engines, vesselNameById]
+  );
+
   const filteredEngines = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    if (!query) return engines;
+    if (!query) {
+      return enrichedEngines;
+    }
 
-    return engines.filter((engine) =>
+    return enrichedEngines.filter((engine) =>
       [
         engine.engine_id,
         engine.vessel_id,
+        engine.vessel_name,
         engine.brand,
         engine.model,
+        engine.engine_name,
         engine.serial_number,
         engine.fuel_type,
-        engine.boat_name,
         engine.company,
+        engine.propeller,
+        engine.gear_ratio,
       ].some((value) =>
         String(value ?? "")
           .toLowerCase()
           .includes(query)
       )
     );
-  }, [engines, search]);
+  }, [enrichedEngines, search]);
+
+  const sortedEngines = useMemo(() => {
+    const selectedColumn = sortableColumns.find(
+      (column) => column.id === orderBy
+    );
+
+    return [...filteredEngines].sort((left, right) => {
+      const comparison = compareValues(
+        left[orderBy],
+        right[orderBy],
+        selectedColumn?.numeric
+      );
+
+      return order === "asc" ? comparison : -comparison;
+    });
+  }, [filteredEngines, order, orderBy]);
+
+  const visibleEngines = useMemo(() => {
+    const start = page * rowsPerPage;
+    return sortedEngines.slice(start, start + rowsPerPage);
+  }, [page, rowsPerPage, sortedEngines]);
+
+  function handleSort(columnId) {
+    const isAscending =
+      orderBy === columnId && order === "asc";
+
+    setOrder(isAscending ? "desc" : "asc");
+    setOrderBy(columnId);
+  }
 
   function openCreateDialog() {
     setEditingId(null);
@@ -190,7 +285,9 @@ export default function Engines() {
   }
 
   function closeFormDialog() {
-    if (saving) return;
+    if (saving) {
+      return;
+    }
 
     setFormOpen(false);
     setEditingId(null);
@@ -207,16 +304,30 @@ export default function Engines() {
   }
 
   function validateForm() {
-    if (!form.EngineID.trim()) return "Engine ID is required";
-    if (!form.VesselID.trim()) return "Vessel is required";
-    if (!form.Brand.trim()) return "Brand is required";
-    if (!form.Model.trim()) return "Model is required";
+    if (!form.EngineID.trim()) {
+      return "Engine ID is required";
+    }
+
+    if (!form.VesselID.trim()) {
+      return "Vessel is required";
+    }
+
+    if (!form.Brand.trim()) {
+      return "Brand is required";
+    }
+
+    if (!form.Model.trim()) {
+      return "Model is required";
+    }
 
     if (form.HP !== "" && Number(form.HP) <= 0) {
       return "HP must be greater than zero";
     }
 
-    if (form.EngineHours !== "" && Number(form.EngineHours) < 0) {
+    if (
+      form.EngineHours !== "" &&
+      Number(form.EngineHours) < 0
+    ) {
       return "Engine hours cannot be negative";
     }
 
@@ -235,7 +346,10 @@ export default function Engines() {
 
     const payload = {
       ...form,
-      HP: form.HP === "" ? null : Number(form.HP),
+      HP:
+        form.HP === ""
+          ? null
+          : Number(form.HP),
       EngineHours:
         form.EngineHours === ""
           ? null
@@ -278,7 +392,9 @@ export default function Engines() {
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget) {
+      return;
+    }
 
     try {
       setDeleting(true);
@@ -286,7 +402,9 @@ export default function Engines() {
       setSuccess("");
 
       await api.delete(
-        `/engines/${encodeURIComponent(deleteTarget.engine_id)}`
+        `/engines/${encodeURIComponent(
+          deleteTarget.engine_id
+        )}`
       );
 
       setSuccess("Engine deleted successfully");
@@ -304,17 +422,54 @@ export default function Engines() {
     }
   }
 
+  function openActionMenu(event, engine) {
+    setActionAnchor(event.currentTarget);
+    setActionEngine(engine);
+  }
+
+  function closeActionMenu() {
+    setActionAnchor(null);
+    setActionEngine(null);
+  }
+
+  function handleEditFromMenu() {
+    if (actionEngine) {
+      openEditDialog(actionEngine);
+    }
+
+    closeActionMenu();
+  }
+
+  function handleDeleteFromMenu() {
+    if (actionEngine) {
+      setDeleteTarget(actionEngine);
+    }
+
+    closeActionMenu();
+  }
+
   return (
     <Box>
       <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          flexDirection: {
+            xs: "column",
+            sm: "row",
+          },
+          justifyContent: "space-between",
+          alignItems: {
+            xs: "stretch",
+            sm: "center",
+          },
+          gap: 2,
+          mb: 3,
+        }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography
+            variant="h4"
+            sx={{ fontWeight: 700 }}
+          >
             Engines
           </Typography>
 
@@ -354,21 +509,34 @@ export default function Engines() {
 
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          alignItems="center"
+          sx={{
+            flexDirection: {
+              xs: "column",
+              sm: "row",
+            },
+            alignItems: {
+              xs: "stretch",
+              sm: "center",
+            },
+            gap: 2,
+          }}
         >
           <TextField
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
             placeholder="Search engine, vessel, brand, model, serial number..."
             fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 
@@ -384,105 +552,275 @@ export default function Engines() {
             </span>
           </Tooltip>
         </Stack>
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: "block",
+            mt: 1.25,
+          }}
+        >
+          Showing {filteredEngines.length} of{" "}
+          {engines.length} engines
+        </Typography>
       </Paper>
 
-      <TableContainer component={Paper}>
-        {loading ? (
-          <Box
-            sx={{
-              minHeight: 260,
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Engine ID</TableCell>
-                <TableCell>Engine</TableCell>
-                <TableCell>Vessel</TableCell>
-                <TableCell>Customer</TableCell>
-                <TableCell align="right">HP</TableCell>
-                <TableCell align="right">Hours</TableCell>
-                <TableCell>Serial number</TableCell>
-                <TableCell>Fuel type</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {filteredEngines.map((engine) => (
-                <TableRow key={engine.engine_id} hover>
-                  <TableCell>{engine.engine_id}</TableCell>
-
-                  <TableCell>
-                    <Typography fontWeight={600}>
-                      {[engine.brand, engine.model]
-                        .filter(Boolean)
-                        .join(" ") || "Unnamed engine"}
-                    </Typography>
-
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                    >
-                      {engine.install_date
-                        ? `Installed ${formatDate(engine.install_date)}`
-                        : "Installation date not recorded"}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    {engine.boat_name ||
-                      vesselNameById.get(engine.vessel_id) ||
-                      engine.vessel_id ||
-                      "—"}
-                  </TableCell>
-
-                  <TableCell>{engine.company || "—"}</TableCell>
-                  <TableCell align="right">{engine.hp ?? "—"}</TableCell>
-                  <TableCell align="right">
-                    {engine.engine_hours ?? "—"}
-                  </TableCell>
-                  <TableCell>{engine.serial_number || "—"}</TableCell>
-                  <TableCell>{engine.fuel_type || "—"}</TableCell>
-
-                  <TableCell align="right">
-                    <Tooltip title="Edit">
-                      <IconButton
-                        color="primary"
-                        onClick={() => openEditDialog(engine)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="Delete">
-                      <IconButton
-                        color="error"
-                        onClick={() => setDeleteTarget(engine)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {!filteredEngines.length && (
+      <Paper>
+        <TableContainer>
+          {loading ? (
+            <Box
+              sx={{
+                minHeight: 260,
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    No engines found.
+                  {sortableColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      align={column.numeric ? "right" : "left"}
+                      sx={{
+                        display:
+                          column.id === "vessel_name"
+                            ? {
+                                xs: "none",
+                                sm: "table-cell",
+                              }
+                            : column.id === "engine_hours"
+                              ? {
+                                  xs: "none",
+                                  md: "table-cell",
+                                }
+                              : "table-cell",
+                      }}
+                    >
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={
+                          orderBy === column.id
+                            ? order
+                            : "asc"
+                        }
+                        onClick={() =>
+                          handleSort(column.id)
+                        }
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
+
+                  <TableCell
+                    sx={{
+                      display: {
+                        xs: "none",
+                        md: "table-cell",
+                      },
+                    }}
+                  >
+                    Customer
+                  </TableCell>
+
+                  <TableCell
+                    sx={{
+                      display: {
+                        xs: "none",
+                        lg: "table-cell",
+                      },
+                    }}
+                  >
+                    Serial number
+                  </TableCell>
+
+                  <TableCell
+                    sx={{
+                      display: {
+                        xs: "none",
+                        lg: "table-cell",
+                      },
+                    }}
+                  >
+                    Fuel type
+                  </TableCell>
+
+                  <TableCell align="right">
+                    Actions
                   </TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHead>
+
+              <TableBody>
+                {visibleEngines.map((engine) => (
+                  <TableRow
+                    key={engine.engine_id}
+                    hover
+                  >
+                    <TableCell>
+                      {engine.engine_id}
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {engine.engine_name}
+                      </Typography>
+
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                      >
+                        {engine.install_date
+                          ? `Installed ${formatDate(
+                              engine.install_date
+                            )}`
+                          : "Installation date not recorded"}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          sm: "table-cell",
+                        },
+                      }}
+                    >
+                      {engine.vessel_name || "—"}
+                    </TableCell>
+
+                    <TableCell align="right">
+                      {engine.hp ?? "—"}
+                    </TableCell>
+
+                    <TableCell
+                      align="right"
+                      sx={{
+                        display: {
+                          xs: "none",
+                          md: "table-cell",
+                        },
+                      }}
+                    >
+                      {engine.engine_hours ?? "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          md: "table-cell",
+                        },
+                      }}
+                    >
+                      {engine.company || "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          lg: "table-cell",
+                        },
+                      }}
+                    >
+                      {engine.serial_number || "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          lg: "table-cell",
+                        },
+                      }}
+                    >
+                      {engine.fuel_type || "—"}
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Tooltip title="Engine actions">
+                        <IconButton
+                          size="small"
+                          onClick={(event) =>
+                            openActionMenu(event, engine)
+                          }
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {!visibleEngines.length && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      align="center"
+                      sx={{ py: 5 }}
+                    >
+                      No engines found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
+
+        {!loading && (
+          <TablePagination
+            component="div"
+            count={sortedEngines.length}
+            page={page}
+            onPageChange={(_event, nextPage) =>
+              setPage(nextPage)
+            }
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(
+                Number(event.target.value)
+              );
+              setPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         )}
-      </TableContainer>
+      </Paper>
+
+      <Menu
+        anchorEl={actionAnchor}
+        open={Boolean(actionAnchor)}
+        onClose={closeActionMenu}
+      >
+        <MenuItem onClick={handleEditFromMenu}>
+          <EditIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Edit
+        </MenuItem>
+
+        <MenuItem
+          onClick={handleDeleteFromMenu}
+          sx={{ color: "error.main" }}
+        >
+          <DeleteIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Delete
+        </MenuItem>
+      </Menu>
 
       <Dialog
         open={formOpen}
@@ -490,7 +828,10 @@ export default function Engines() {
         fullWidth
         maxWidth="md"
       >
-        <Box component="form" onSubmit={handleSubmit}>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+        >
           <DialogTitle>
             {editingId ? "Edit engine" : "Add engine"}
           </DialogTitle>
@@ -532,7 +873,9 @@ export default function Engines() {
                     {vessel.boat_name || vessel.vessel_id}
                     {" — "}
                     {vessel.vessel_id}
-                    {vessel.company ? ` — ${vessel.company}` : ""}
+                    {vessel.company
+                      ? ` — ${vessel.company}`
+                      : ""}
                   </MenuItem>
                 ))}
               </TextField>
@@ -550,7 +893,10 @@ export default function Engines() {
                 </MenuItem>
 
                 {engineBrands.map((brand) => (
-                  <MenuItem key={brand} value={brand}>
+                  <MenuItem
+                    key={brand}
+                    value={brand}
+                  >
                     {brand}
                   </MenuItem>
                 ))}
@@ -571,7 +917,12 @@ export default function Engines() {
                 value={form.HP}
                 onChange={handleChange}
                 required
-                inputProps={{ min: 0, step: "any" }}
+                slotProps={{
+                  htmlInput: {
+                    min: 0,
+                    step: "any",
+                  },
+                }}
               />
 
               <TextField
@@ -587,7 +938,11 @@ export default function Engines() {
                 type="date"
                 value={form.InstallDate}
                 onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{
+                  inputLabel: {
+                    shrink: true,
+                  },
+                }}
               />
 
               <TextField
@@ -596,7 +951,12 @@ export default function Engines() {
                 type="number"
                 value={form.EngineHours}
                 onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
+                slotProps={{
+                  htmlInput: {
+                    min: 0,
+                    step: "any",
+                  },
+                }}
               />
 
               <TextField
@@ -619,7 +979,11 @@ export default function Engines() {
                 type="date"
                 value={form.WarrantyExpiry}
                 onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{
+                  inputLabel: {
+                    shrink: true,
+                  },
+                }}
               />
 
               <TextField
@@ -634,7 +998,10 @@ export default function Engines() {
                 </MenuItem>
 
                 {fuelTypes.map((fuelType) => (
-                  <MenuItem key={fuelType} value={fuelType}>
+                  <MenuItem
+                    key={fuelType}
+                    value={fuelType}
+                  >
                     {fuelType}
                   </MenuItem>
                 ))}
