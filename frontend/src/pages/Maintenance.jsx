@@ -1,33 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  InputAdornment,
-  MenuItem,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Tooltip,
-  Typography,
+  Alert, Box, Button, Chip, CircularProgress, Dialog,
+  DialogActions, DialogContent, DialogTitle, IconButton,
+  InputAdornment, Menu, MenuItem, Paper, Stack, Table,
+  TableBody, TableCell, TableContainer, TableHead,
+  TablePagination, TableRow, TableSortLabel, TextField,
+  Tooltip, Typography
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -35,49 +19,31 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  MaintenanceID: "",
-  EngineID: "",
-  ServiceDate: "",
-  EngineHours: "",
-  ServiceType: "",
-  Technician: "",
-  PartsReplaced: "",
-  LaborHours: "",
-  LaborCost: "",
-  PartsCost: "",
-  DowntimeHours: "",
-  WarrantyClaim: "No",
-  Status: "Completed",
-  NextServiceDate: "",
-  NextServiceHours: "",
-  Remarks: "",
+  MaintenanceID: "", EngineID: "", ServiceDate: "",
+  EngineHours: "", ServiceType: "", Technician: "",
+  PartsReplaced: "", LaborHours: "", LaborCost: "",
+  PartsCost: "", DowntimeHours: "", WarrantyClaim: "No",
+  Status: "Completed", NextServiceDate: "",
+  NextServiceHours: "", Remarks: ""
 };
 
 const serviceTypes = [
-  "Inspection",
-  "Routine Service",
-  "250 Hour Service",
-  "500 Hour Service",
-  "1000 Hour Service",
-  "Annual Service",
-  "Repair",
-  "Emergency Repair",
-  "Warranty Work",
-  "Repowering",
-  "Other",
+  "Inspection", "Routine Service", "250 Hour Service",
+  "500 Hour Service", "1000 Hour Service", "Annual Service",
+  "Repair", "Emergency Repair", "Warranty Work",
+  "Repowering", "Other"
 ];
 
-const statuses = [
-  "Open",
-  "In Progress",
-  "Completed",
-  "Cancelled",
-];
+const statuses = ["Open", "In Progress", "Completed", "Cancelled"];
+const warrantyOptions = ["No", "Yes", "Pending"];
 
-const warrantyOptions = [
-  "No",
-  "Yes",
-  "Pending",
+const sortableColumns = [
+  { id: "maintenance_id", label: "Maintenance ID" },
+  { id: "service_date", label: "Date" },
+  { id: "engine_name", label: "Engine" },
+  { id: "status", label: "Status" },
+  { id: "engine_hours", label: "Engine hours", numeric: true },
+  { id: "total_cost", label: "Total cost", numeric: true },
 ];
 
 function formatDate(value) {
@@ -90,15 +56,9 @@ function numberOrNull(value) {
 }
 
 function currency(value) {
-  if (value === null || value === undefined || value === "") {
-    return "—";
-  }
-
+  if (value === null || value === undefined || value === "") return "—";
   const number = Number(value);
-
-  if (Number.isNaN(number)) {
-    return String(value);
-  }
+  if (Number.isNaN(number)) return String(value);
 
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -109,15 +69,11 @@ function currency(value) {
 
 function statusColor(status) {
   switch (status) {
-    case "Completed":
-      return "success";
-    case "In Progress":
-      return "warning";
-    case "Cancelled":
-      return "default";
+    case "Completed": return "success";
+    case "In Progress": return "warning";
+    case "Cancelled": return "default";
     case "Open":
-    default:
-      return "info";
+    default: return "info";
   }
 }
 
@@ -142,23 +98,36 @@ function mapRowToForm(row) {
   };
 }
 
+function compareValues(left, right, numeric = false) {
+  if (numeric) return Number(left ?? 0) - Number(right ?? 0);
+  return String(left ?? "").localeCompare(String(right ?? ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
 export default function Maintenance() {
   const [records, setRecords] = useState([]);
   const [engines, setEngines] = useState([]);
-
   const [search, setSearch] = useState("");
+  const [orderBy, setOrderBy] = useState("service_date");
+  const [order, setOrder] = useState("desc");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
-
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const [actionAnchor, setActionAnchor] = useState(null);
+  const [actionRecord, setActionRecord] = useState(null);
 
   async function loadData() {
     try {
@@ -183,58 +152,87 @@ export default function Maintenance() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to load maintenance data"
+        err.message ||
+        "Unable to load maintenance data"
       );
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { setPage(0); }, [search, rowsPerPage]);
 
   const engineById = useMemo(() => {
     const map = new Map();
-
-    engines.forEach((engine) => {
-      map.set(engine.engine_id, engine);
-    });
-
+    engines.forEach((engine) => map.set(engine.engine_id, engine));
     return map;
   }, [engines]);
 
+  const enrichedRecords = useMemo(
+    () => records.map((record) => {
+      const engine = engineById.get(record.engine_id);
+      return {
+        ...record,
+        engine_name:
+          [record.brand, record.model].filter(Boolean).join(" ") ||
+          [engine?.brand, engine?.model].filter(Boolean).join(" ") ||
+          record.engine_id ||
+          "",
+        vessel_name: record.boat_name || engine?.boat_name || "",
+        customer_name: record.company || engine?.company || "",
+        serial_value:
+          record.serial_number ||
+          engine?.serial_number ||
+          record.engine_id ||
+          "",
+        total_cost:
+          Number(record.labor_cost || 0) +
+          Number(record.parts_cost || 0),
+      };
+    }),
+    [records, engineById]
+  );
+
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
+    if (!query) return enrichedRecords;
 
-    if (!query) {
-      return records;
-    }
-
-    return records.filter((record) =>
+    return enrichedRecords.filter((record) =>
       [
-        record.maintenance_id,
-        record.engine_id,
-        record.brand,
-        record.model,
-        record.serial_number,
-        record.boat_name,
-        record.company,
-        record.service_type,
-        record.technician,
-        record.status,
-        record.warranty_claim,
-        record.parts_replaced,
-        record.remarks,
-        formatDate(record.service_date),
+        record.maintenance_id, record.engine_id, record.engine_name,
+        record.serial_value, record.vessel_name, record.customer_name,
+        record.service_type, record.technician, record.status,
+        record.warranty_claim, record.parts_replaced, record.remarks,
+        formatDate(record.service_date)
       ].some((value) =>
-        String(value ?? "")
-          .toLowerCase()
-          .includes(query)
+        String(value ?? "").toLowerCase().includes(query)
       )
     );
-  }, [records, search]);
+  }, [enrichedRecords, search]);
+
+  const sortedRecords = useMemo(() => {
+    const selected = sortableColumns.find((column) => column.id === orderBy);
+    return [...filteredRecords].sort((left, right) => {
+      const comparison = compareValues(
+        left[orderBy],
+        right[orderBy],
+        selected?.numeric
+      );
+      return order === "asc" ? comparison : -comparison;
+    });
+  }, [filteredRecords, order, orderBy]);
+
+  const visibleRecords = useMemo(() => {
+    const start = page * rowsPerPage;
+    return sortedRecords.slice(start, start + rowsPerPage);
+  }, [page, rowsPerPage, sortedRecords]);
+
+  function handleSort(columnId) {
+    const isAscending = orderBy === columnId && order === "asc";
+    setOrder(isAscending ? "desc" : "asc");
+    setOrderBy(columnId);
+  }
 
   function openCreateDialog() {
     setEditingId(null);
@@ -251,10 +249,7 @@ export default function Maintenance() {
   }
 
   function closeFormDialog() {
-    if (saving) {
-      return;
-    }
-
+    if (saving) return;
     setFormOpen(false);
     setEditingId(null);
     setForm(emptyForm);
@@ -262,25 +257,13 @@ export default function Maintenance() {
 
   function handleChange(event) {
     const { name, value } = event.target;
-
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
   }
 
   function validateForm() {
-    if (!form.MaintenanceID.trim()) {
-      return "Maintenance ID is required";
-    }
-
-    if (!form.EngineID.trim()) {
-      return "Engine is required";
-    }
-
-    if (!form.ServiceDate) {
-      return "Service date is required";
-    }
+    if (!form.MaintenanceID.trim()) return "Maintenance ID is required";
+    if (!form.EngineID.trim()) return "Engine is required";
+    if (!form.ServiceDate) return "Service date is required";
 
     const nonNegativeFields = [
       ["EngineHours", "Engine hours"],
@@ -310,7 +293,6 @@ export default function Maintenance() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-
     const validationError = validateForm();
 
     if (validationError) {
@@ -339,7 +321,6 @@ export default function Maintenance() {
           `/maintenance/${encodeURIComponent(editingId)}`,
           payload
         );
-
         setSuccess("Maintenance record updated successfully");
       } else {
         await api.post("/maintenance", payload);
@@ -349,13 +330,12 @@ export default function Maintenance() {
       setFormOpen(false);
       setEditingId(null);
       setForm(emptyForm);
-
       await loadData();
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to save maintenance record"
+        err.message ||
+        "Unable to save maintenance record"
       );
     } finally {
       setSaving(false);
@@ -363,50 +343,62 @@ export default function Maintenance() {
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) {
-      return;
-    }
+    if (!deleteTarget) return;
 
     try {
       setDeleting(true);
       setError("");
       setSuccess("");
-
       await api.delete(
-        `/maintenance/${encodeURIComponent(
-          deleteTarget.maintenance_id
-        )}`
+        `/maintenance/${encodeURIComponent(deleteTarget.maintenance_id)}`
       );
-
       setSuccess("Maintenance record deleted successfully");
       setDeleteTarget(null);
-
       await loadData();
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to delete maintenance record"
+        err.message ||
+        "Unable to delete maintenance record"
       );
     } finally {
       setDeleting(false);
     }
   }
 
+  function openActionMenu(event, record) {
+    setActionAnchor(event.currentTarget);
+    setActionRecord(record);
+  }
+
+  function closeActionMenu() {
+    setActionAnchor(null);
+    setActionRecord(null);
+  }
+
+  function handleEditFromMenu() {
+    if (actionRecord) openEditDialog(actionRecord);
+    closeActionMenu();
+  }
+
+  function handleDeleteFromMenu() {
+    if (actionRecord) setDeleteTarget(actionRecord);
+    closeActionMenu();
+  }
+
   return (
     <Box>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
-      >
+      <Stack sx={{
+        flexDirection: { xs: "column", sm: "row" },
+        justifyContent: "space-between",
+        alignItems: { xs: "stretch", sm: "center" },
+        gap: 2,
+        mb: 3,
+      }}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
             Maintenance
           </Typography>
-
           <Typography color="text.secondary">
             Record service work, costs, downtime, and the next service due.
           </Typography>
@@ -422,223 +414,216 @@ export default function Maintenance() {
       </Stack>
 
       {error && (
-        <Alert
-          severity="error"
-          onClose={() => setError("")}
-          sx={{ mb: 2 }}
-        >
+        <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert
-          severity="success"
-          onClose={() => setSuccess("")}
-          sx={{ mb: 2 }}
-        >
+        <Alert severity="success" onClose={() => setSuccess("")} sx={{ mb: 2 }}>
           {success}
         </Alert>
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          alignItems="center"
-        >
+        <Stack sx={{
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "stretch", sm: "center" },
+          gap: 2,
+        }}>
           <TextField
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search service, engine, vessel, customer, technician..."
             fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 
           <Tooltip title="Refresh">
             <span>
-              <IconButton
-                onClick={loadData}
-                disabled={loading}
-                color="primary"
-              >
+              <IconButton onClick={loadData} disabled={loading} color="primary">
                 <RefreshIcon />
               </IconButton>
             </span>
           </Tooltip>
         </Stack>
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1.25 }}
+        >
+          Showing {filteredRecords.length} of {records.length} records
+        </Typography>
       </Paper>
 
-      <TableContainer component={Paper}>
-        {loading ? (
-          <Box
-            sx={{
-              minHeight: 260,
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Maintenance ID</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Engine</TableCell>
-                <TableCell>Vessel / Customer</TableCell>
-                <TableCell>Service</TableCell>
-                <TableCell>Technician</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Engine hours</TableCell>
-                <TableCell align="right">Total cost</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
+      <Paper>
+        <TableContainer>
+          {loading ? (
+            <Box sx={{ minHeight: 260, display: "grid", placeItems: "center" }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {sortableColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      align={column.numeric ? "right" : "left"}
+                      sx={{
+                        display:
+                          column.id === "status"
+                            ? { xs: "none", sm: "table-cell" }
+                            : column.id === "engine_hours"
+                              ? { xs: "none", md: "table-cell" }
+                              : "table-cell",
+                      }}
+                    >
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={orderBy === column.id ? order : "asc"}
+                        onClick={() => handleSort(column.id)}
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
 
-            <TableBody>
-              {filteredRecords.map((record) => {
-                const engine = engineById.get(record.engine_id);
-                const totalCost =
-                  Number(record.labor_cost || 0) +
-                  Number(record.parts_cost || 0);
+                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                    Vessel / Customer
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                    Service
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                    Technician
+                  </TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
 
-                return (
+              <TableBody>
+                {visibleRecords.map((record) => (
                   <TableRow key={record.maintenance_id} hover>
                     <TableCell>{record.maintenance_id}</TableCell>
+                    <TableCell>{formatDate(record.service_date) || "—"}</TableCell>
                     <TableCell>
-                      {formatDate(record.service_date) || "—"}
-                    </TableCell>
-
-                    <TableCell>
-                      <Typography fontWeight={600}>
-                        {[record.brand, record.model]
-                          .filter(Boolean)
-                          .join(" ") ||
-                          [engine?.brand, engine?.model]
-                            .filter(Boolean)
-                            .join(" ") ||
-                          record.engine_id}
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {record.engine_name}
                       </Typography>
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        {record.serial_number ||
-                          engine?.serial_number ||
-                          record.engine_id}
+                      <Typography variant="caption" color="text.secondary">
+                        {record.serial_value}
                       </Typography>
                     </TableCell>
-
-                    <TableCell>
-                      <Typography>
-                        {record.boat_name ||
-                          engine?.boat_name ||
-                          "—"}
-                      </Typography>
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        {record.company ||
-                          engine?.company ||
-                          "—"}
-                      </Typography>
-                    </TableCell>
-
-                    <TableCell>
-                      {record.service_type || "—"}
-                    </TableCell>
-
-                    <TableCell>
-                      {record.technician || "—"}
-                    </TableCell>
-
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                       <Chip
                         size="small"
                         label={record.status || "Open"}
                         color={statusColor(record.status)}
                       />
                     </TableCell>
-
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{ display: { xs: "none", md: "table-cell" } }}
+                    >
                       {record.engine_hours ?? "—"}
                     </TableCell>
-
                     <TableCell align="right">
-                      {currency(totalCost)}
+                      {currency(record.total_cost)}
                     </TableCell>
-
+                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                      <Typography variant="body2">
+                        {record.vessel_name || "—"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {record.customer_name || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                      {record.service_type || "—"}
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                      {record.technician || "—"}
+                    </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Edit">
+                      <Tooltip title="Maintenance actions">
                         <IconButton
-                          color="primary"
-                          onClick={() => openEditDialog(record)}
+                          size="small"
+                          onClick={(event) => openActionMenu(event, record)}
                         >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-
-                      <Tooltip title="Delete">
-                        <IconButton
-                          color="error"
-                          onClick={() => setDeleteTarget(record)}
-                        >
-                          <DeleteIcon />
+                          <MoreVertIcon />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                ))}
 
-              {!filteredRecords.length && (
-                <TableRow>
-                  <TableCell colSpan={10} align="center">
-                    No maintenance records found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                {!visibleRecords.length && (
+                  <TableRow>
+                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
+                      No maintenance records found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
+
+        {!loading && (
+          <TablePagination
+            component="div"
+            count={sortedRecords.length}
+            page={page}
+            onPageChange={(_event, nextPage) => setPage(nextPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(Number(event.target.value));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         )}
-      </TableContainer>
+      </Paper>
 
-      <Dialog
-        open={formOpen}
-        onClose={closeFormDialog}
-        fullWidth
-        maxWidth="md"
+      <Menu
+        anchorEl={actionAnchor}
+        open={Boolean(actionAnchor)}
+        onClose={closeActionMenu}
       >
+        <MenuItem onClick={handleEditFromMenu}>
+          <EditIcon fontSize="small" sx={{ mr: 1.25 }} />
+          Edit
+        </MenuItem>
+        <MenuItem onClick={handleDeleteFromMenu} sx={{ color: "error.main" }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1.25 }} />
+          Delete
+        </MenuItem>
+      </Menu>
+
+      <Dialog open={formOpen} onClose={closeFormDialog} fullWidth maxWidth="md">
         <Box component="form" onSubmit={handleSubmit}>
           <DialogTitle>
-            {editingId
-              ? "Edit maintenance record"
-              : "Add maintenance record"}
+            {editingId ? "Edit maintenance record" : "Add maintenance record"}
           </DialogTitle>
 
           <DialogContent dividers>
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "1fr 1fr",
-                },
-                gap: 2,
-                pt: 1,
-              }}
-            >
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 2,
+              pt: 1,
+            }}>
               <TextField
                 label="Maintenance ID"
                 name="MaintenanceID"
@@ -657,21 +642,13 @@ export default function Maintenance() {
                 required
               >
                 {engines.map((engine) => (
-                  <MenuItem
-                    key={engine.engine_id}
-                    value={engine.engine_id}
-                  >
-                    {[engine.brand, engine.model]
-                      .filter(Boolean)
-                      .join(" ") || engine.engine_id}
+                  <MenuItem key={engine.engine_id} value={engine.engine_id}>
+                    {[engine.brand, engine.model].filter(Boolean).join(" ") ||
+                      engine.engine_id}
                     {" — "}
                     {engine.engine_id}
-                    {engine.boat_name
-                      ? ` — ${engine.boat_name}`
-                      : ""}
-                    {engine.company
-                      ? ` — ${engine.company}`
-                      : ""}
+                    {engine.boat_name ? ` — ${engine.boat_name}` : ""}
+                    {engine.company ? ` — ${engine.company}` : ""}
                   </MenuItem>
                 ))}
               </TextField>
@@ -683,17 +660,27 @@ export default function Maintenance() {
                 value={form.ServiceDate}
                 onChange={handleChange}
                 required
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
 
-              <TextField
-                label="Engine hours"
-                name="EngineHours"
-                type="number"
-                value={form.EngineHours}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
+              {[
+                ["EngineHours", "Engine hours"],
+                ["LaborHours", "Labor hours"],
+                ["LaborCost", "Labor cost"],
+                ["PartsCost", "Parts cost"],
+                ["DowntimeHours", "Downtime hours"],
+                ["NextServiceHours", "Next service hours"],
+              ].map(([name, label]) => (
+                <TextField
+                  key={name}
+                  label={label}
+                  name={name}
+                  type="number"
+                  value={form[name]}
+                  onChange={handleChange}
+                  slotProps={{ htmlInput: { min: 0, step: "any" } }}
+                />
+              ))}
 
               <TextField
                 select
@@ -702,15 +689,9 @@ export default function Maintenance() {
                 value={form.ServiceType}
                 onChange={handleChange}
               >
-                <MenuItem value="">
-                  <em>Select service type</em>
-                </MenuItem>
-
+                <MenuItem value=""><em>Select service type</em></MenuItem>
                 {serviceTypes.map((serviceType) => (
-                  <MenuItem
-                    key={serviceType}
-                    value={serviceType}
-                  >
+                  <MenuItem key={serviceType} value={serviceType}>
                     {serviceType}
                   </MenuItem>
                 ))}
@@ -721,42 +702,6 @@ export default function Maintenance() {
                 name="Technician"
                 value={form.Technician}
                 onChange={handleChange}
-              />
-
-              <TextField
-                label="Labor hours"
-                name="LaborHours"
-                type="number"
-                value={form.LaborHours}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Labor cost"
-                name="LaborCost"
-                type="number"
-                value={form.LaborCost}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Parts cost"
-                name="PartsCost"
-                type="number"
-                value={form.PartsCost}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Downtime hours"
-                name="DowntimeHours"
-                type="number"
-                value={form.DowntimeHours}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
               />
 
               <TextField
@@ -793,16 +738,7 @@ export default function Maintenance() {
                 type="date"
                 value={form.NextServiceDate}
                 onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-              />
-
-              <TextField
-                label="Next service hours"
-                name="NextServiceHours"
-                type="number"
-                value={form.NextServiceHours}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
 
               <TextField
@@ -828,18 +764,10 @@ export default function Maintenance() {
           </DialogContent>
 
           <DialogActions>
-            <Button
-              onClick={closeFormDialog}
-              disabled={saving}
-            >
+            <Button onClick={closeFormDialog} disabled={saving}>
               Cancel
             </Button>
-
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={saving}
-            >
+            <Button type="submit" variant="contained" disabled={saving}>
               {saving
                 ? "Saving..."
                 : editingId

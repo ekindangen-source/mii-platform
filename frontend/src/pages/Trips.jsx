@@ -1,32 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  InputAdornment,
-  MenuItem,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Tooltip,
-  Typography,
+  Alert, Box, Button, CircularProgress, Dialog, DialogActions,
+  DialogContent, DialogTitle, IconButton, InputAdornment, Menu,
+  MenuItem, Paper, Stack, Table, TableBody, TableCell,
+  TableContainer, TableHead, TablePagination, TableRow,
+  TableSortLabel, TextField, Tooltip, Typography
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -34,27 +18,20 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  TripID: "",
-  VesselID: "",
-  Date: "",
-  Captain: "",
-  OperatingHours: "",
-  DistanceNM: "",
-  AverageSpeedKn: "",
-  FuelUsedL: "",
-  FuelPricePerL: "",
-  ElectricityKWh: "",
-  Weather: "",
-  SeaState: "",
-  Payload: "",
+  TripID: "", VesselID: "", Date: "", Captain: "",
+  OperatingHours: "", DistanceNM: "", AverageSpeedKn: "",
+  FuelUsedL: "", FuelPricePerL: "", ElectricityKWh: "",
+  Weather: "", SeaState: "", Payload: ""
 };
 
-const seaStates = [
-  "Calm",
-  "Slight",
-  "Moderate",
-  "Rough",
-  "Very Rough",
+const seaStates = ["Calm", "Slight", "Moderate", "Rough", "Very Rough"];
+
+const sortableColumns = [
+  { id: "trip_id", label: "Trip ID" },
+  { id: "trip_date", label: "Date" },
+  { id: "vessel_name", label: "Vessel" },
+  { id: "operating_hours", label: "Hours", numeric: true },
+  { id: "distance_nm", label: "Distance (NM)", numeric: true },
 ];
 
 function formatDate(value) {
@@ -84,10 +61,23 @@ function numberOrNull(value) {
   return value === "" ? null : Number(value);
 }
 
+function compareValues(left, right, numeric = false) {
+  if (numeric) return Number(left ?? 0) - Number(right ?? 0);
+  return String(left ?? "").localeCompare(String(right ?? ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
 export default function Trips() {
   const [trips, setTrips] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [search, setSearch] = useState("");
+  const [orderBy, setOrderBy] = useState("trip_date");
+  const [order, setOrder] = useState("desc");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -99,77 +89,96 @@ export default function Trips() {
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [actionAnchor, setActionAnchor] = useState(null);
+  const [actionTrip, setActionTrip] = useState(null);
+
   async function loadData() {
     try {
       setLoading(true);
       setError("");
-
       const [tripsResponse, vesselsResponse] = await Promise.all([
         api.get("/trips"),
         api.get("/vessels"),
       ]);
-
       if (!Array.isArray(tripsResponse.data)) {
         throw new Error("Unexpected trips response");
       }
-
       if (!Array.isArray(vesselsResponse.data)) {
         throw new Error("Unexpected vessels response");
       }
-
       setTrips(tripsResponse.data);
       setVessels(vesselsResponse.data);
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to load trip data"
+        err.message ||
+        "Unable to load trip data"
       );
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { setPage(0); }, [search, rowsPerPage]);
 
   const vesselNameById = useMemo(() => {
     const map = new Map();
-
     vessels.forEach((vessel) => {
-      map.set(
-        vessel.vessel_id,
-        vessel.boat_name || vessel.vessel_id
-      );
+      map.set(vessel.vessel_id, vessel.boat_name || vessel.vessel_id);
     });
-
     return map;
   }, [vessels]);
 
+  const enrichedTrips = useMemo(
+    () => trips.map((trip) => ({
+      ...trip,
+      vessel_name:
+        trip.boat_name ||
+        vesselNameById.get(trip.vessel_id) ||
+        trip.vessel_id ||
+        "",
+    })),
+    [trips, vesselNameById]
+  );
+
   const filteredTrips = useMemo(() => {
     const query = search.trim().toLowerCase();
+    if (!query) return enrichedTrips;
 
-    if (!query) return trips;
-
-    return trips.filter((trip) =>
+    return enrichedTrips.filter((trip) =>
       [
-        trip.trip_id,
-        trip.vessel_id,
-        trip.boat_name,
-        trip.company,
-        trip.captain,
-        trip.weather,
-        trip.sea_state,
-        trip.payload,
-        formatDate(trip.trip_date),
+        trip.trip_id, trip.vessel_id, trip.vessel_name,
+        trip.company, trip.captain, trip.weather,
+        trip.sea_state, trip.payload, formatDate(trip.trip_date)
       ].some((value) =>
-        String(value ?? "")
-          .toLowerCase()
-          .includes(query)
+        String(value ?? "").toLowerCase().includes(query)
       )
     );
-  }, [trips, search]);
+  }, [enrichedTrips, search]);
+
+  const sortedTrips = useMemo(() => {
+    const selected = sortableColumns.find((column) => column.id === orderBy);
+    return [...filteredTrips].sort((left, right) => {
+      const comparison = compareValues(
+        left[orderBy],
+        right[orderBy],
+        selected?.numeric
+      );
+      return order === "asc" ? comparison : -comparison;
+    });
+  }, [filteredTrips, order, orderBy]);
+
+  const visibleTrips = useMemo(() => {
+    const start = page * rowsPerPage;
+    return sortedTrips.slice(start, start + rowsPerPage);
+  }, [page, rowsPerPage, sortedTrips]);
+
+  function handleSort(columnId) {
+    const isAscending = orderBy === columnId && order === "asc";
+    setOrder(isAscending ? "desc" : "asc");
+    setOrderBy(columnId);
+  }
 
   function openCreateDialog() {
     setEditingId(null);
@@ -187,7 +196,6 @@ export default function Trips() {
 
   function closeFormDialog() {
     if (saving) return;
-
     setFormOpen(false);
     setEditingId(null);
     setForm(emptyForm);
@@ -195,22 +203,14 @@ export default function Trips() {
 
   function handleChange(event) {
     const { name, value } = event.target;
-
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
   }
 
   function validateForm() {
     if (!form.TripID.trim()) return "Trip ID is required";
     if (!form.VesselID.trim()) return "Vessel is required";
     if (!form.Date) return "Trip date is required";
-
-    if (
-      form.OperatingHours !== "" &&
-      Number(form.OperatingHours) <= 0
-    ) {
+    if (form.OperatingHours !== "" && Number(form.OperatingHours) <= 0) {
       return "Operating hours must be greater than zero";
     }
 
@@ -233,7 +233,6 @@ export default function Trips() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-
     const validationError = validateForm();
 
     if (validationError) {
@@ -257,11 +256,7 @@ export default function Trips() {
       setSuccess("");
 
       if (editingId) {
-        await api.put(
-          `/trips/${encodeURIComponent(editingId)}`,
-          payload
-        );
-
+        await api.put(`/trips/${encodeURIComponent(editingId)}`, payload);
         setSuccess("Trip updated successfully");
       } else {
         await api.post("/trips", payload);
@@ -271,13 +266,12 @@ export default function Trips() {
       setFormOpen(false);
       setEditingId(null);
       setForm(emptyForm);
-
       await loadData();
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to save trip"
+        err.message ||
+        "Unable to save trip"
       );
     } finally {
       setSaving(false);
@@ -291,40 +285,56 @@ export default function Trips() {
       setDeleting(true);
       setError("");
       setSuccess("");
-
       await api.delete(
         `/trips/${encodeURIComponent(deleteTarget.trip_id)}`
       );
-
       setSuccess("Trip deleted successfully");
       setDeleteTarget(null);
-
       await loadData();
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to delete trip"
+        err.message ||
+        "Unable to delete trip"
       );
     } finally {
       setDeleting(false);
     }
   }
 
+  function openActionMenu(event, trip) {
+    setActionAnchor(event.currentTarget);
+    setActionTrip(trip);
+  }
+
+  function closeActionMenu() {
+    setActionAnchor(null);
+    setActionTrip(null);
+  }
+
+  function handleEditFromMenu() {
+    if (actionTrip) openEditDialog(actionTrip);
+    closeActionMenu();
+  }
+
+  function handleDeleteFromMenu() {
+    if (actionTrip) setDeleteTarget(actionTrip);
+    closeActionMenu();
+  }
+
   return (
     <Box>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
-      >
+      <Stack sx={{
+        flexDirection: { xs: "column", sm: "row" },
+        justifyContent: "space-between",
+        alignItems: { xs: "stretch", sm: "center" },
+        gap: 2,
+        mb: 3,
+      }}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
             Trips
           </Typography>
-
           <Typography color="text.secondary">
             Record vessel activity, operating hours, distance, and energy use.
           </Typography>
@@ -340,172 +350,207 @@ export default function Trips() {
       </Stack>
 
       {error && (
-        <Alert
-          severity="error"
-          onClose={() => setError("")}
-          sx={{ mb: 2 }}
-        >
+        <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert
-          severity="success"
-          onClose={() => setSuccess("")}
-          sx={{ mb: 2 }}
-        >
+        <Alert severity="success" onClose={() => setSuccess("")} sx={{ mb: 2 }}>
           {success}
         </Alert>
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          alignItems="center"
-        >
+        <Stack sx={{
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "stretch", sm: "center" },
+          gap: 2,
+        }}>
           <TextField
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search trip, vessel, captain, customer, weather..."
             fullWidth
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 
           <Tooltip title="Refresh">
             <span>
-              <IconButton
-                onClick={loadData}
-                disabled={loading}
-                color="primary"
-              >
+              <IconButton onClick={loadData} disabled={loading} color="primary">
                 <RefreshIcon />
               </IconButton>
             </span>
           </Tooltip>
         </Stack>
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1.25 }}
+        >
+          Showing {filteredTrips.length} of {trips.length} trips
+        </Typography>
       </Paper>
 
-      <TableContainer component={Paper}>
-        {loading ? (
-          <Box
-            sx={{
-              minHeight: 260,
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Trip ID</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Vessel</TableCell>
-                <TableCell>Customer</TableCell>
-                <TableCell>Captain</TableCell>
-                <TableCell align="right">Hours</TableCell>
-                <TableCell align="right">Distance (NM)</TableCell>
-                <TableCell align="right">Fuel (L)</TableCell>
-                <TableCell>Sea state</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {filteredTrips.map((trip) => (
-                <TableRow key={trip.trip_id} hover>
-                  <TableCell>{trip.trip_id}</TableCell>
-                  <TableCell>{formatDate(trip.trip_date) || "—"}</TableCell>
-
-                  <TableCell>
-                    <Typography fontWeight={600}>
-                      {trip.boat_name ||
-                        vesselNameById.get(trip.vessel_id) ||
-                        trip.vessel_id ||
-                        "—"}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>{trip.company || "—"}</TableCell>
-                  <TableCell>{trip.captain || "—"}</TableCell>
-                  <TableCell align="right">
-                    {trip.operating_hours ?? "—"}
-                  </TableCell>
-                  <TableCell align="right">
-                    {trip.distance_nm ?? "—"}
-                  </TableCell>
-                  <TableCell align="right">
-                    {trip.fuel_used_l ?? "—"}
-                  </TableCell>
-                  <TableCell>{trip.sea_state || "—"}</TableCell>
-
-                  <TableCell align="right">
-                    <Tooltip title="Edit">
-                      <IconButton
-                        color="primary"
-                        onClick={() => openEditDialog(trip)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="Delete">
-                      <IconButton
-                        color="error"
-                        onClick={() => setDeleteTarget(trip)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {!filteredTrips.length && (
+      <Paper>
+        <TableContainer>
+          {loading ? (
+            <Box sx={{ minHeight: 260, display: "grid", placeItems: "center" }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={10} align="center">
-                    No trips found.
+                  {sortableColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      align={column.numeric ? "right" : "left"}
+                      sx={{
+                        display:
+                          column.id === "vessel_name"
+                            ? { xs: "none", sm: "table-cell" }
+                            : column.id === "distance_nm"
+                              ? { xs: "none", md: "table-cell" }
+                              : "table-cell",
+                      }}
+                    >
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={orderBy === column.id ? order : "asc"}
+                        onClick={() => handleSort(column.id)}
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
+
+                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                    Captain
                   </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ display: { xs: "none", lg: "table-cell" } }}
+                  >
+                    Fuel (L)
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                    Sea state
+                  </TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHead>
+
+              <TableBody>
+                {visibleTrips.map((trip) => (
+                  <TableRow key={trip.trip_id} hover>
+                    <TableCell>{trip.trip_id}</TableCell>
+                    <TableCell>{formatDate(trip.trip_date) || "—"}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {trip.vessel_name || "—"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {trip.company || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {trip.operating_hours ?? "—"}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ display: { xs: "none", md: "table-cell" } }}
+                    >
+                      {trip.distance_nm ?? "—"}
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                      {trip.captain || "—"}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ display: { xs: "none", lg: "table-cell" } }}
+                    >
+                      {trip.fuel_used_l ?? "—"}
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                      {trip.sea_state || "—"}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Trip actions">
+                        <IconButton
+                          size="small"
+                          onClick={(event) => openActionMenu(event, trip)}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {!visibleTrips.length && (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                      No trips found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
+
+        {!loading && (
+          <TablePagination
+            component="div"
+            count={sortedTrips.length}
+            page={page}
+            onPageChange={(_event, nextPage) => setPage(nextPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(Number(event.target.value));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         )}
-      </TableContainer>
+      </Paper>
 
-      <Dialog
-        open={formOpen}
-        onClose={closeFormDialog}
-        fullWidth
-        maxWidth="md"
+      <Menu
+        anchorEl={actionAnchor}
+        open={Boolean(actionAnchor)}
+        onClose={closeActionMenu}
       >
-        <Box component="form" onSubmit={handleSubmit}>
-          <DialogTitle>
-            {editingId ? "Edit trip" : "Add trip"}
-          </DialogTitle>
+        <MenuItem onClick={handleEditFromMenu}>
+          <EditIcon fontSize="small" sx={{ mr: 1.25 }} />
+          Edit
+        </MenuItem>
+        <MenuItem onClick={handleDeleteFromMenu} sx={{ color: "error.main" }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1.25 }} />
+          Delete
+        </MenuItem>
+      </Menu>
 
+      <Dialog open={formOpen} onClose={closeFormDialog} fullWidth maxWidth="md">
+        <Box component="form" onSubmit={handleSubmit}>
+          <DialogTitle>{editingId ? "Edit trip" : "Add trip"}</DialogTitle>
           <DialogContent dividers>
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "1fr 1fr",
-                },
-                gap: 2,
-                pt: 1,
-              }}
-            >
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 2,
+              pt: 1,
+            }}>
               <TextField
                 label="Trip ID"
                 name="TripID"
@@ -524,10 +569,7 @@ export default function Trips() {
                 required
               >
                 {vessels.map((vessel) => (
-                  <MenuItem
-                    key={vessel.vessel_id}
-                    value={vessel.vessel_id}
-                  >
+                  <MenuItem key={vessel.vessel_id} value={vessel.vessel_id}>
                     {vessel.boat_name || vessel.vessel_id}
                     {" — "}
                     {vessel.vessel_id}
@@ -543,7 +585,7 @@ export default function Trips() {
                 value={form.Date}
                 onChange={handleChange}
                 required
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
 
               <TextField
@@ -553,60 +595,25 @@ export default function Trips() {
                 onChange={handleChange}
               />
 
-              <TextField
-                label="Operating hours"
-                name="OperatingHours"
-                type="number"
-                value={form.OperatingHours}
-                onChange={handleChange}
-                required
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Distance (NM)"
-                name="DistanceNM"
-                type="number"
-                value={form.DistanceNM}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Average speed (kn)"
-                name="AverageSpeedKn"
-                type="number"
-                value={form.AverageSpeedKn}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Fuel used (L)"
-                name="FuelUsedL"
-                type="number"
-                value={form.FuelUsedL}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Fuel price per L"
-                name="FuelPricePerL"
-                type="number"
-                value={form.FuelPricePerL}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
-
-              <TextField
-                label="Electricity (kWh)"
-                name="ElectricityKWh"
-                type="number"
-                value={form.ElectricityKWh}
-                onChange={handleChange}
-                inputProps={{ min: 0, step: "any" }}
-              />
+              {[
+                ["OperatingHours", "Operating hours"],
+                ["DistanceNM", "Distance (NM)"],
+                ["AverageSpeedKn", "Average speed (kn)"],
+                ["FuelUsedL", "Fuel used (L)"],
+                ["FuelPricePerL", "Fuel price per L"],
+                ["ElectricityKWh", "Electricity (kWh)"],
+              ].map(([name, label]) => (
+                <TextField
+                  key={name}
+                  label={label}
+                  name={name}
+                  type="number"
+                  value={form[name]}
+                  onChange={handleChange}
+                  required={name === "OperatingHours"}
+                  slotProps={{ htmlInput: { min: 0, step: "any" } }}
+                />
+              ))}
 
               <TextField
                 label="Weather"
@@ -622,10 +629,7 @@ export default function Trips() {
                 value={form.SeaState}
                 onChange={handleChange}
               >
-                <MenuItem value="">
-                  <em>Select sea state</em>
-                </MenuItem>
-
+                <MenuItem value=""><em>Select sea state</em></MenuItem>
                 {seaStates.map((seaState) => (
                   <MenuItem key={seaState} value={seaState}>
                     {seaState}
@@ -646,23 +650,11 @@ export default function Trips() {
           </DialogContent>
 
           <DialogActions>
-            <Button
-              onClick={closeFormDialog}
-              disabled={saving}
-            >
+            <Button onClick={closeFormDialog} disabled={saving}>
               Cancel
             </Button>
-
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={saving}
-            >
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update trip"
-                  : "Create trip"}
+            <Button type="submit" variant="contained" disabled={saving}>
+              {saving ? "Saving..." : editingId ? "Update trip" : "Create trip"}
             </Button>
           </DialogActions>
         </Box>
