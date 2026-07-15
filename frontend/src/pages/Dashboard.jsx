@@ -154,10 +154,12 @@ function StatCard({
       >
         <CardContent>
           <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="flex-start"
-            spacing={2}
+            sx={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 2,
+            }}
           >
             <Box>
               <Typography
@@ -168,7 +170,7 @@ function StatCard({
                 {title}
               </Typography>
 
-              <Typography variant="h4" fontWeight={700}>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
                 {value}
               </Typography>
 
@@ -382,7 +384,12 @@ export default function Dashboard() {
           placeItems: "center",
         }}
       >
-        <Stack alignItems="center" spacing={2}>
+        <Stack
+          sx={{
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
           <CircularProgress />
           <Typography color="text.secondary">
             Loading dashboard...
@@ -395,14 +402,22 @@ export default function Dashboard() {
   return (
     <Box>
       <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
+        sx={{
+          flexDirection: {
+            xs: "column",
+            sm: "row",
+          },
+          justifyContent: "space-between",
+          alignItems: {
+            xs: "stretch",
+            sm: "center",
+          },
+          gap: 2,
+          mb: 3,
+        }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
             Welcome,{" "}
             {user?.fullName || user?.email || "User"}
           </Typography>
@@ -523,7 +538,12 @@ export default function Dashboard() {
         }}
       >
         <Paper sx={{ p: 2.5 }}>
-          <Stack direction="row" spacing={1.5}>
+          <Stack
+            sx={{
+              flexDirection: "row",
+              gap: 1.5,
+            }}
+          >
             <LocalGasStationIcon color="primary" />
 
             <Box>
@@ -531,7 +551,7 @@ export default function Dashboard() {
                 Fuel used this month
               </Typography>
 
-              <Typography variant="h5" fontWeight={700}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 {formatNumber(metrics.fuelThisMonth)} L
               </Typography>
             </Box>
@@ -539,7 +559,12 @@ export default function Dashboard() {
         </Paper>
 
         <Paper sx={{ p: 2.5 }}>
-          <Stack direction="row" spacing={1.5}>
+          <Stack
+            sx={{
+              flexDirection: "row",
+              gap: 1.5,
+            }}
+          >
             <ScheduleIcon color="primary" />
 
             <Box>
@@ -547,7 +572,7 @@ export default function Dashboard() {
                 Operating hours this month
               </Typography>
 
-              <Typography variant="h5" fontWeight={700}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 {formatNumber(
                   metrics.operatingHoursThisMonth
                 )}{" "}
@@ -558,7 +583,12 @@ export default function Dashboard() {
         </Paper>
 
         <Paper sx={{ p: 2.5 }}>
-          <Stack direction="row" spacing={1.5}>
+          <Stack
+            sx={{
+              flexDirection: "row",
+              gap: 1.5,
+            }}
+          >
             <SpeedIcon color="primary" />
 
             <Box>
@@ -566,7 +596,7 @@ export default function Dashboard() {
                 Maintenance cost this month
               </Typography>
 
-              <Typography variant="h5" fontWeight={700}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 {formatCurrency(
                   metrics.maintenanceCostThisMonth
                 )}
@@ -589,13 +619,15 @@ export default function Dashboard() {
       >
         <Paper sx={{ p: 2.5 }}>
           <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ mb: 1 }}
+            sx={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 1,
+            }}
           >
             <Box>
-              <Typography variant="h6" fontWeight={700}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Maintenance attention
               </Typography>
 
@@ -670,13 +702,15 @@ export default function Dashboard() {
 
         <Paper sx={{ p: 2.5 }}>
           <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ mb: 1 }}
+            sx={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 1,
+            }}
           >
             <Box>
-              <Typography variant="h6" fontWeight={700}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Recent trips
               </Typography>
 
@@ -735,7 +769,7 @@ export default function Dashboard() {
       </Box>
 
       <Paper sx={{ p: 2.5 }}>
-        <Typography variant="h6" fontWeight={700}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Engine brand distribution
         </Typography>
 
@@ -748,7 +782,7 @@ export default function Dashboard() {
         </Typography>
 
         {metrics.engineBrands.length ? (
-          <Stack spacing={1.5}>
+          <Stack sx={{ gap: 1.5 }}>
             {metrics.engineBrands.map(([brand, count]) => {
               const percentage = data.engines.length
                 ? (count / data.engines.length) * 100
@@ -757,9 +791,11 @@ export default function Dashboard() {
               return (
                 <Box key={brand}>
                   <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    sx={{ mb: 0.5 }}
+                    sx={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      mb: 0.5,
+                    }}
                   >
                     <Typography>{brand}</Typography>
 

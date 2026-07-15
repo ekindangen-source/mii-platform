@@ -161,9 +161,11 @@ export default function Sidebar({ onNavigate }) {
         }}
       >
         <Stack
-          direction="row"
-          spacing={1.5}
-          alignItems="center"
+          sx={{
+            flexDirection: "row",
+            gap: 1.5,
+            alignItems: "center",
+          }}
         >
           <Box
             sx={{
@@ -186,8 +188,10 @@ export default function Sidebar({ onNavigate }) {
           <Box>
             <Typography
               variant="subtitle1"
-              fontWeight={800}
-              lineHeight={1.15}
+              sx={{
+                fontWeight: 800,
+                lineHeight: 1.15,
+              }}
             >
               MII Platform
             </Typography>
@@ -296,13 +300,19 @@ export default function Sidebar({ onNavigate }) {
                       <ListItemText
                         primary={item.label}
                         secondary="Coming soon"
-                        primaryTypographyProps={{
-                          fontSize: 14,
-                        }}
-                        secondaryTypographyProps={{
-                          fontSize: 10,
-                          color:
-                            "rgba(255,255,255,0.22)",
+                        slotProps={{
+                          primary: {
+                            sx: {
+                              fontSize: 14,
+                            },
+                          },
+                          secondary: {
+                            sx: {
+                              fontSize: 10,
+                              color:
+                                "rgba(255,255,255,0.22)",
+                            },
+                          },
                         }}
                       />
                     </ListItemButton>
@@ -324,9 +334,13 @@ export default function Sidebar({ onNavigate }) {
 
                     <ListItemText
                       primary={item.label}
-                      primaryTypographyProps={{
-                        fontSize: 14,
-                        fontWeight: 500,
+                      slotProps={{
+                        primary: {
+                          sx: {
+                            fontSize: 14,
+                            fontWeight: 500,
+                          },
+                        },
                       }}
                     />
                   </ListItemButton>
@@ -346,10 +360,10 @@ export default function Sidebar({ onNavigate }) {
         }}
       >
         <Stack
-          direction="row"
-          spacing={1.25}
-          alignItems="center"
           sx={{
+            flexDirection: "row",
+            gap: 1.25,
+            alignItems: "center",
             px: 1,
             py: 1,
             mb: 1,
@@ -370,8 +384,8 @@ export default function Sidebar({ onNavigate }) {
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
               variant="body2"
-              fontWeight={700}
               noWrap
+              sx={{ fontWeight: 700 }}
             >
               {user?.fullName ||
                 user?.email ||

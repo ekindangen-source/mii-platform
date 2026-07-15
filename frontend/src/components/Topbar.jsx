@@ -13,6 +13,8 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 
+import TopbarSearch from "./TopbarSearch";
+
 const pageTitles = {
   "/": "Dashboard",
   "/customers": "Customers",
@@ -68,6 +70,8 @@ export default function Topbar() {
           Marine Intelligence Indonesia
         </Typography>
       </Box>
+
+<TopbarSearch />
 
       <Box
         sx={{
