@@ -345,7 +345,14 @@ export default function Customers() {
   }
 
   return (
-    <Box>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+      }}
+    >
       <Stack
         sx={{
           flexDirection: {
@@ -404,7 +411,7 @@ export default function Customers() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, minWidth: 0, overflow: "hidden" }}>
         <Stack
           sx={{
             flexDirection: {
@@ -463,8 +470,8 @@ export default function Customers() {
         </Typography>
       </Paper>
 
-      <Paper>
-        <TableContainer>
+      <Paper sx={{ width: "100%", maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
+        <TableContainer sx={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
           {loading ? (
             <Box
               sx={{
@@ -476,7 +483,19 @@ export default function Customers() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                width: "100%",
+                tableLayout: "fixed",
+                "& .MuiTableCell-root": {
+                  px: { xs: 0.75, sm: 2 },
+                  py: { xs: 1, sm: 1.25 },
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -485,17 +504,21 @@ export default function Customers() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "contact_person"
-                            ? {
-                                xs: "none",
-                                md: "table-cell",
-                              }
+                          column.id === "company"
+                            ? "table-cell"
                             : column.id === "province"
-                              ? {
-                                  xs: "none",
-                                  sm: "table-cell",
-                                }
-                              : "table-cell",
+                              ? { xs: "none", sm: "table-cell" }
+                              : column.id === "contact_person"
+                                ? { xs: "none", md: "table-cell" }
+                                : column.id === "customer_id" ||
+                                    column.id === "fleet_size"
+                                  ? { xs: "none", sm: "table-cell" }
+                                  : "table-cell",
+                        width:
+                          column.id === "company"
+                            ? { xs: "auto", sm: "30%" }
+                            : undefined,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       <TableSortLabel
@@ -536,8 +559,17 @@ export default function Customers() {
                     Email
                   </TableCell>
 
-                  <TableCell align="right">
-                    Actions
+                  <TableCell
+                    align="right"
+                    sx={{
+                      width: { xs: 48, sm: 88 },
+                      minWidth: { xs: 48, sm: 88 },
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                      Actions
+                    </Box>
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -548,14 +580,21 @@ export default function Customers() {
                     key={customer.customer_id}
                     hover
                   >
-                    <TableCell>
+                    <TableCell
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
                       {customer.customer_id}
                     </TableCell>
 
-                    <TableCell>
+                    <TableCell sx={{ minWidth: 0 }}>
                       <Typography
                         variant="body2"
-                        sx={{ fontWeight: 600 }}
+                        sx={{
+                          fontWeight: 600,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         {customer.company}
                       </Typography>
@@ -563,6 +602,12 @@ export default function Customers() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        sx={{
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         {customer.industry || "—"}
                       </Typography>
@@ -590,7 +635,10 @@ export default function Customers() {
                       {customer.province || "—"}
                     </TableCell>
 
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
                       {customer.fleet_size ?? "—"}
                     </TableCell>
 
@@ -616,7 +664,14 @@ export default function Customers() {
                       {customer.email || "—"}
                     </TableCell>
 
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 48, sm: 88 },
+                        minWidth: { xs: 48, sm: 88 },
+                        px: { xs: 0.25, sm: 1 },
+                      }}
+                    >
                       <Tooltip title="Customer actions">
                         <IconButton
                           size="small"
@@ -650,6 +705,23 @@ export default function Customers() {
         {!loading && (
           <TablePagination
             component="div"
+            sx={{
+              width: "100%",
+              overflow: "hidden",
+              "& .MuiTablePagination-toolbar": {
+                px: { xs: 0.5, sm: 2 },
+                minHeight: 52,
+              },
+              "& .MuiTablePagination-selectLabel": {
+                display: { xs: "none", sm: "block" },
+              },
+              "& .MuiTablePagination-displayedRows": {
+                mx: { xs: 0.5, sm: 2 },
+              },
+              "& .MuiTablePagination-actions": {
+                ml: { xs: 0.25, sm: 2 },
+              },
+            }}
             count={sortedCustomers.length}
             page={page}
             onPageChange={(_event, nextPage) =>
