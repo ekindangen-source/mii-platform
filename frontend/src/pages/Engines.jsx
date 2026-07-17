@@ -449,7 +449,14 @@ export default function Engines() {
   }
 
   return (
-    <Box>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+      }}
+    >
       <Stack
         sx={{
           flexDirection: {
@@ -507,7 +514,16 @@ export default function Engines() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper
+        sx={{
+          p: { xs: 1.5, sm: 2 },
+          mb: 2,
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
         <Stack
           sx={{
             flexDirection: {
@@ -566,8 +582,21 @@ export default function Engines() {
         </Typography>
       </Paper>
 
-      <Paper>
-        <TableContainer>
+      <Paper
+        sx={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
+        <TableContainer
+          sx={{
+            width: "100%",
+            maxWidth: "100%",
+            overflowX: { xs: "hidden", sm: "auto" },
+          }}
+        >
           {loading ? (
             <Box
               sx={{
@@ -579,7 +608,13 @@ export default function Engines() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                width: "100%",
+                tableLayout: { xs: "fixed", sm: "auto" },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -588,17 +623,31 @@ export default function Engines() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "vessel_name"
+                          column.id === "engine_id"
                             ? {
                                 xs: "none",
                                 sm: "table-cell",
                               }
-                            : column.id === "engine_hours"
+                            : column.id === "vessel_name"
                               ? {
                                   xs: "none",
-                                  md: "table-cell",
+                                  sm: "table-cell",
                                 }
-                              : "table-cell",
+                              : column.id === "engine_hours"
+                                ? {
+                                    xs: "none",
+                                    md: "table-cell",
+                                  }
+                                : "table-cell",
+                        ...(column.id === "engine_name" && {
+                          width: { xs: "auto", sm: "auto" },
+                          pl: { xs: 1.5, sm: 2 },
+                          pr: { xs: 0.5, sm: 2 },
+                        }),
+                        ...(column.id === "hp" && {
+                          width: { xs: 58, sm: "auto" },
+                          px: { xs: 0.5, sm: 2 },
+                        }),
                       }}
                     >
                       <TableSortLabel
@@ -650,8 +699,20 @@ export default function Engines() {
                     Fuel type
                   </TableCell>
 
-                  <TableCell align="right">
-                    Actions
+                  <TableCell
+                    align="right"
+                    sx={{
+                      width: { xs: 48, sm: "auto" },
+                      px: { xs: 0.5, sm: 2 },
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", sm: "inline" } }}
+                    >
+                      Actions
+                    </Box>
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -662,14 +723,33 @@ export default function Engines() {
                     key={engine.engine_id}
                     hover
                   >
-                    <TableCell>
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          sm: "table-cell",
+                        },
+                      }}
+                    >
                       {engine.engine_id}
                     </TableCell>
 
-                    <TableCell>
+                    <TableCell
+                      sx={{
+                        minWidth: 0,
+                        pl: { xs: 1.5, sm: 2 },
+                        pr: { xs: 0.5, sm: 2 },
+                        overflow: "hidden",
+                      }}
+                    >
                       <Typography
                         variant="body2"
-                        sx={{ fontWeight: 600 }}
+                        sx={{
+                          fontWeight: 600,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         {engine.engine_name}
                       </Typography>
@@ -677,6 +757,22 @@ export default function Engines() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        sx={{
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {engine.vessel_name || "No vessel assigned"}
+                      </Typography>
+
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: { xs: "none", sm: "block" },
+                        }}
                       >
                         {engine.install_date
                           ? `Installed ${formatDate(
@@ -697,7 +793,14 @@ export default function Engines() {
                       {engine.vessel_name || "—"}
                     </TableCell>
 
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 58, sm: "auto" },
+                        px: { xs: 0.5, sm: 2 },
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {engine.hp ?? "—"}
                     </TableCell>
 
@@ -746,7 +849,14 @@ export default function Engines() {
                       {engine.fuel_type || "—"}
                     </TableCell>
 
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 48, sm: "auto" },
+                        px: { xs: 0.5, sm: 2 },
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       <Tooltip title="Engine actions">
                         <IconButton
                           size="small"
@@ -780,6 +890,30 @@ export default function Engines() {
         {!loading && (
           <TablePagination
             component="div"
+            sx={{
+              width: "100%",
+              maxWidth: "100%",
+              overflow: "hidden",
+              "& .MuiTablePagination-toolbar": {
+                minHeight: 52,
+                px: { xs: 0.5, sm: 2 },
+                gap: { xs: 0, sm: 1 },
+              },
+              "& .MuiTablePagination-selectLabel": {
+                display: { xs: "none", sm: "block" },
+              },
+              "& .MuiTablePagination-displayedRows": {
+                ml: { xs: 0, sm: 1 },
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+              "& .MuiTablePagination-actions": {
+                ml: { xs: 0, sm: 2 },
+              },
+              "& .MuiTablePagination-select": {
+                pl: { xs: 0, sm: 1 },
+                pr: { xs: 2, sm: 3 },
+              },
+            }}
             count={sortedEngines.length}
             page={page}
             onPageChange={(_event, nextPage) =>
