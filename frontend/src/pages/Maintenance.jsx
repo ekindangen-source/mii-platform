@@ -40,7 +40,7 @@ const warrantyOptions = ["No", "Yes", "Pending"];
 const sortableColumns = [
   { id: "maintenance_id", label: "Maintenance ID" },
   { id: "service_date", label: "Date" },
-  { id: "engine_name", label: "Engine" },
+  { id: "engine_name", label: "Service / Engine" },
   { id: "status", label: "Status" },
   { id: "engine_hours", label: "Engine hours", numeric: true },
   { id: "total_cost", label: "Total cost", numeric: true },
@@ -387,7 +387,14 @@ export default function Maintenance() {
   }
 
   return (
-    <Box>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+      }}
+    >
       <Stack sx={{
         flexDirection: { xs: "column", sm: "row" },
         justifyContent: "space-between",
@@ -408,6 +415,7 @@ export default function Maintenance() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={openCreateDialog}
+          sx={{ width: { xs: "100%", sm: "auto" } }}
         >
           Add maintenance
         </Button>
@@ -425,7 +433,16 @@ export default function Maintenance() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper
+        sx={{
+          p: { xs: 1.5, sm: 2 },
+          mb: 2,
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
         <Stack sx={{
           flexDirection: { xs: "column", sm: "row" },
           alignItems: { xs: "stretch", sm: "center" },
@@ -437,6 +454,7 @@ export default function Maintenance() {
             placeholder="Search service, engine, vessel, customer, technician..."
             fullWidth
             size="small"
+            sx={{ minWidth: 0 }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -466,14 +484,37 @@ export default function Maintenance() {
         </Typography>
       </Paper>
 
-      <Paper>
-        <TableContainer>
+      <Paper
+        sx={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
+        <TableContainer
+          sx={{
+            width: "100%",
+            maxWidth: "100%",
+            overflowX: "hidden",
+          }}
+        >
           {loading ? (
             <Box sx={{ minHeight: 260, display: "grid", placeItems: "center" }}>
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                width: "100%",
+                tableLayout: { xs: "fixed", sm: "auto" },
+                "& .MuiTableCell-root": {
+                  px: { xs: 1, sm: 2 },
+                  py: { xs: 1.25, sm: 1 },
+                },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -482,11 +523,20 @@ export default function Maintenance() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "status"
+                          column.id === "maintenance_id" ||
+                          column.id === "service_date"
                             ? { xs: "none", sm: "table-cell" }
                             : column.id === "engine_hours"
                               ? { xs: "none", md: "table-cell" }
-                              : "table-cell",
+                              : column.id === "total_cost"
+                                ? { xs: "none", sm: "table-cell" }
+                                : "table-cell",
+                        ...(column.id === "engine_name" && {
+                          width: { xs: "auto", sm: "auto" },
+                        }),
+                        ...(column.id === "status" && {
+                          width: { xs: 92, sm: "auto" },
+                        }),
                       }}
                     >
                       <TableSortLabel
@@ -508,24 +558,81 @@ export default function Maintenance() {
                   <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                     Technician
                   </TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      width: { xs: 48, sm: "auto" },
+                      minWidth: { xs: 48, sm: "auto" },
+                      px: { xs: 0.5, sm: 2 },
+                    }}
+                  >
+                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                      Actions
+                    </Box>
+                  </TableCell>
                 </TableRow>
               </TableHead>
 
               <TableBody>
                 {visibleRecords.map((record) => (
                   <TableRow key={record.maintenance_id} hover>
-                    <TableCell>{record.maintenance_id}</TableCell>
-                    <TableCell>{formatDate(record.service_date) || "—"}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {record.engine_name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {record.serial_value}
-                      </Typography>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                      {record.maintenance_id}
                     </TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                      {formatDate(record.service_date) || "—"}
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {record.engine_name}
+                      </Typography>
+
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                          {formatDate(record.service_date) || "Date not recorded"}
+                          {record.vessel_name ? ` • ${record.vessel_name}` : ""}
+                        </Box>
+                        <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                          {record.serial_value}
+                        </Box>
+                      </Typography>
+
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: { xs: "block", sm: "none" },
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {record.service_type || record.customer_name || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        width: { xs: 92, sm: "auto" },
+                        px: { xs: 0.5, sm: 2 },
+                      }}
+                    >
                       <Chip
                         size="small"
                         label={record.status || "Open"}
@@ -538,7 +645,10 @@ export default function Maintenance() {
                     >
                       {record.engine_hours ?? "—"}
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{ display: { xs: "none", sm: "table-cell" } }}
+                    >
                       {currency(record.total_cost)}
                     </TableCell>
                     <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
@@ -555,7 +665,14 @@ export default function Maintenance() {
                     <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                       {record.technician || "—"}
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 48, sm: "auto" },
+                        minWidth: { xs: 48, sm: "auto" },
+                        px: { xs: 0.25, sm: 2 },
+                      }}
+                    >
                       <Tooltip title="Maintenance actions">
                         <IconButton
                           size="small"
@@ -592,6 +709,30 @@ export default function Maintenance() {
               setPage(0);
             }}
             rowsPerPageOptions={[5, 10, 25, 50]}
+            labelRowsPerPage="Rows per page"
+            sx={{
+              width: "100%",
+              maxWidth: "100%",
+              overflow: "hidden",
+              "& .MuiTablePagination-toolbar": {
+                minHeight: 52,
+                px: { xs: 0.5, sm: 2 },
+                justifyContent: { xs: "center", sm: "flex-end" },
+              },
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-input": {
+                display: { xs: "none", sm: "inline-flex" },
+              },
+              "& .MuiTablePagination-displayedRows": {
+                m: 0,
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+              "& .MuiTablePagination-actions": {
+                ml: { xs: 0.5, sm: 2 },
+              },
+              "& .MuiIconButton-root": {
+                p: { xs: 0.75, sm: 1 },
+              },
+            }}
           />
         )}
       </Paper>
