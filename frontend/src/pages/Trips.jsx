@@ -418,7 +418,7 @@ export default function Trips() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "vessel_name"
+                          column.id === "trip_date"
                             ? { xs: "none", sm: "table-cell" }
                             : column.id === "distance_nm"
                               ? { xs: "none", md: "table-cell" }
