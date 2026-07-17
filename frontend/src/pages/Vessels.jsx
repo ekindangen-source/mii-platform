@@ -407,7 +407,14 @@ export default function Vessels() {
   }
 
   return (
-    <Box>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+      }}
+    >
       <Stack
         sx={{
           flexDirection: {
@@ -465,7 +472,7 @@ export default function Vessels() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper sx={{ p: 2, mb: 2, width: "100%", minWidth: 0, overflow: "hidden" }}>
         <Stack
           sx={{
             flexDirection: {
@@ -524,8 +531,22 @@ export default function Vessels() {
         </Typography>
       </Paper>
 
-      <Paper>
-        <TableContainer>
+      <Paper
+        sx={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
+        <TableContainer
+          sx={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            overflowX: "hidden",
+          }}
+        >
           {loading ? (
             <Box
               sx={{
@@ -537,7 +558,13 @@ export default function Vessels() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                width: "100%",
+                tableLayout: "fixed",
+              }}
+            >
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -546,17 +573,29 @@ export default function Vessels() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "customer_name"
+                          column.id === "vessel_id"
                             ? {
                                 xs: "none",
                                 sm: "table-cell",
                               }
-                            : column.id === "year_built"
+                            : column.id === "customer_name"
                               ? {
                                   xs: "none",
-                                  md: "table-cell",
+                                  sm: "table-cell",
                                 }
-                              : "table-cell",
+                              : column.id === "year_built"
+                                ? {
+                                    xs: "none",
+                                    md: "table-cell",
+                                  }
+                                : "table-cell",
+                        width:
+                          column.id === "boat_name"
+                            ? { xs: "auto", sm: 180 }
+                            : column.id === "length_m"
+                              ? { xs: 72, sm: 90 }
+                              : undefined,
+                        px: { xs: 1, sm: 2 },
                       }}
                     >
                       <TableSortLabel
@@ -608,8 +647,20 @@ export default function Vessels() {
                     Home port
                   </TableCell>
 
-                  <TableCell align="right">
-                    Actions
+                  <TableCell
+                    align="right"
+                    sx={{
+                      width: { xs: 48, sm: 72 },
+                      px: { xs: 0.5, sm: 2 },
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", sm: "inline" } }}
+                    >
+                      Actions
+                    </Box>
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -620,13 +671,26 @@ export default function Vessels() {
                     key={vessel.vessel_id}
                     hover
                   >
-                    <TableCell>
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          sm: "table-cell",
+                        },
+                      }}
+                    >
                       {vessel.vessel_id}
                     </TableCell>
 
-                    <TableCell>
+                    <TableCell
+                      sx={{
+                        minWidth: 0,
+                        px: { xs: 1, sm: 2 },
+                      }}
+                    >
                       <Typography
                         variant="body2"
+                        noWrap
                         sx={{ fontWeight: 600 }}
                       >
                         {vessel.boat_name ||
@@ -636,8 +700,25 @@ export default function Vessels() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        noWrap
+                        sx={{ display: "block" }}
                       >
-                        {vessel.hull_type || "—"}
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "inline", sm: "none" } }}
+                        >
+                          {vessel.customer_name || "No customer"}
+                          {vessel.hull_type
+                            ? ` • ${vessel.hull_type}`
+                            : ""}
+                        </Box>
+
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "none", sm: "inline" } }}
+                        >
+                          {vessel.hull_type || "—"}
+                        </Box>
                       </Typography>
                     </TableCell>
 
@@ -663,7 +744,14 @@ export default function Vessels() {
                       {vessel.year_built ?? "—"}
                     </TableCell>
 
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 72, sm: 90 },
+                        px: { xs: 1, sm: 2 },
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {vessel.length_m ?? "—"}
                     </TableCell>
 
@@ -702,7 +790,13 @@ export default function Vessels() {
                       {vessel.home_port || "—"}
                     </TableCell>
 
-                    <TableCell align="right">
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 48, sm: 72 },
+                        px: { xs: 0.5, sm: 2 },
+                      }}
+                    >
                       <Tooltip title="Vessel actions">
                         <IconButton
                           size="small"
@@ -737,6 +831,31 @@ export default function Vessels() {
           <TablePagination
             component="div"
             count={sortedVessels.length}
+            sx={{
+              width: "100%",
+              maxWidth: "100%",
+              overflow: "hidden",
+              "& .MuiTablePagination-toolbar": {
+                minHeight: 52,
+                px: { xs: 1, sm: 2 },
+              },
+              "& .MuiTablePagination-spacer": {
+                display: { xs: "none", sm: "block" },
+              },
+              "& .MuiTablePagination-selectLabel": {
+                display: { xs: "none", sm: "block" },
+              },
+              "& .MuiTablePagination-select": {
+                display: { xs: "none", sm: "inline-flex" },
+              },
+              "& .MuiTablePagination-displayedRows": {
+                ml: { xs: 0, sm: 2 },
+                whiteSpace: "nowrap",
+              },
+              "& .MuiTablePagination-actions": {
+                ml: { xs: "auto", sm: 2 },
+              },
+            }}
             page={page}
             onPageChange={(_event, nextPage) =>
               setPage(nextPage)
