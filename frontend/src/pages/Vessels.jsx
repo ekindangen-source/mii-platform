@@ -1,26 +1,82 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert, Box, Button, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem,
-  Paper, Stack, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TextField, Tooltip, Typography
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  InputAdornment,
+  Menu,
+  MenuItem,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  TableSortLabel,
+  TextField,
+  Tooltip,
+  Typography,
 } from "@mui/material";
+
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
+
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  VesselID:"", CustomerID:"", BoatName:"", Builder:"", YearBuilt:"",
-  LengthM:"", BeamM:"", HullMaterial:"", HullType:"",
-  PassengerCapacity:"", FuelTankL:"", HomePort:"", TypicalRoute:""
+  VesselID: "",
+  CustomerID: "",
+  BoatName: "",
+  Builder: "",
+  YearBuilt: "",
+  LengthM: "",
+  BeamM: "",
+  HullMaterial: "",
+  HullType: "",
+  PassengerCapacity: "",
+  FuelTankL: "",
+  HomePort: "",
+  TypicalRoute: "",
 };
 
-const hullMaterials = ["Fiberglass","Aluminum","Wood","Steel","HDPE","Other"];
-const hullTypes = ["Monohull","Catamaran","Trimaran","RIB","Other"];
+const hullMaterials = [
+  "Fiberglass",
+  "Aluminum",
+  "Wood",
+  "Steel",
+  "HDPE",
+  "Other",
+];
+
+const hullTypes = [
+  "Monohull",
+  "Catamaran",
+  "Trimaran",
+  "RIB",
+  "Other",
+];
+
+const sortableColumns = [
+  { id: "vessel_id", label: "Vessel ID" },
+  { id: "boat_name", label: "Boat name" },
+  { id: "customer_name", label: "Customer" },
+  { id: "year_built", label: "Year", numeric: true },
+  { id: "length_m", label: "Length (m)", numeric: true },
+];
 
 function mapRow(row) {
   return {
@@ -36,178 +92,1015 @@ function mapRow(row) {
     PassengerCapacity: row.passenger_capacity ?? "",
     FuelTankL: row.fuel_tank_l ?? "",
     HomePort: row.home_port || "",
-    TypicalRoute: row.typical_route || ""
+    TypicalRoute: row.typical_route || "",
   };
 }
 
+function compareValues(left, right, numeric = false) {
+  if (numeric) {
+    return Number(left ?? 0) - Number(right ?? 0);
+  }
+
+  return String(left ?? "").localeCompare(
+    String(right ?? ""),
+    undefined,
+    {
+      numeric: true,
+      sensitivity: "base",
+    }
+  );
+}
+
 export default function Vessels() {
-  const [vessels,setVessels] = useState([]);
-  const [customers,setCustomers] = useState([]);
-  const [search,setSearch] = useState("");
-  const [loading,setLoading] = useState(true);
-  const [saving,setSaving] = useState(false);
-  const [error,setError] = useState("");
-  const [success,setSuccess] = useState("");
-  const [formOpen,setFormOpen] = useState(false);
-  const [editingId,setEditingId] = useState(null);
-  const [form,setForm] = useState(emptyForm);
-  const [deleteTarget,setDeleteTarget] = useState(null);
-  const [deleting,setDeleting] = useState(false);
+  const [vessels, setVessels] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [search, setSearch] = useState("");
+
+  const [orderBy, setOrderBy] = useState("boat_name");
+  const [order, setOrder] = useState("asc");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [actionAnchor, setActionAnchor] = useState(null);
+  const [actionVessel, setActionVessel] = useState(null);
 
   async function loadData() {
     try {
-      setLoading(true); setError("");
-      const [v,c] = await Promise.all([api.get("/vessels"), api.get("/customers")]);
-      if (!Array.isArray(v.data) || !Array.isArray(c.data)) throw new Error("Unexpected API response");
-      setVessels(v.data); setCustomers(c.data);
+      setLoading(true);
+      setError("");
+
+      const [vesselsResponse, customersResponse] =
+        await Promise.all([
+          api.get("/vessels"),
+          api.get("/customers"),
+        ]);
+
+      if (
+        !Array.isArray(vesselsResponse.data) ||
+        !Array.isArray(customersResponse.data)
+      ) {
+        throw new Error("Unexpected API response");
+      }
+
+      setVessels(vesselsResponse.data);
+      setCustomers(customersResponse.data);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to load vessel data");
-    } finally { setLoading(false); }
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to load vessel data"
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, rowsPerPage]);
 
   const customerMap = useMemo(() => {
-    const m = new Map();
-    customers.forEach(c => m.set(c.customer_id, c.company || c.customer_id));
-    return m;
+    const map = new Map();
+
+    customers.forEach((customer) => {
+      map.set(
+        customer.customer_id,
+        customer.company || customer.customer_id
+      );
+    });
+
+    return map;
   }, [customers]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return vessels;
-    return vessels.filter(v => [
-      v.vessel_id,v.boat_name,v.builder,v.company,v.customer_id,
-      v.home_port,v.hull_material,v.hull_type
-    ].some(x => String(x ?? "").toLowerCase().includes(q)));
-  }, [vessels,search]);
+  const enrichedVessels = useMemo(
+    () =>
+      vessels.map((vessel) => ({
+        ...vessel,
+        customer_name:
+          vessel.company ||
+          customerMap.get(vessel.customer_id) ||
+          vessel.customer_id ||
+          "",
+      })),
+    [customerMap, vessels]
+  );
 
-  function openCreate() { setEditingId(null); setForm(emptyForm); setFormOpen(true); }
-  function openEdit(v) { setEditingId(v.vessel_id); setForm(mapRow(v)); setFormOpen(true); }
-  function closeForm() { if (saving) return; setFormOpen(false); setEditingId(null); setForm(emptyForm); }
-  function change(e) { const {name,value}=e.target; setForm(f=>({...f,[name]:value})); }
+  const filteredVessels = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-  async function submit(e) {
-    e.preventDefault();
-    if (!form.VesselID.trim()) return setError("Vessel ID is required");
-    if (!form.CustomerID.trim()) return setError("Customer is required");
+    if (!query) {
+      return enrichedVessels;
+    }
+
+    return enrichedVessels.filter((vessel) =>
+      [
+        vessel.vessel_id,
+        vessel.boat_name,
+        vessel.builder,
+        vessel.customer_name,
+        vessel.customer_id,
+        vessel.home_port,
+        vessel.hull_material,
+        vessel.hull_type,
+        vessel.typical_route,
+      ].some((value) =>
+        String(value ?? "").toLowerCase().includes(query)
+      )
+    );
+  }, [enrichedVessels, search]);
+
+  const sortedVessels = useMemo(() => {
+    const selectedColumn = sortableColumns.find(
+      (column) => column.id === orderBy
+    );
+
+    return [...filteredVessels].sort((left, right) => {
+      const comparison = compareValues(
+        left[orderBy],
+        right[orderBy],
+        selectedColumn?.numeric
+      );
+
+      return order === "asc" ? comparison : -comparison;
+    });
+  }, [filteredVessels, order, orderBy]);
+
+  const visibleVessels = useMemo(() => {
+    const start = page * rowsPerPage;
+    return sortedVessels.slice(start, start + rowsPerPage);
+  }, [page, rowsPerPage, sortedVessels]);
+
+  function handleSort(columnId) {
+    const isAscending =
+      orderBy === columnId && order === "asc";
+
+    setOrder(isAscending ? "desc" : "asc");
+    setOrderBy(columnId);
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setFormOpen(true);
+  }
+
+  function openEdit(vessel) {
+    setEditingId(vessel.vessel_id);
+    setForm(mapRow(vessel));
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    if (saving) {
+      return;
+    }
+
+    setFormOpen(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  function change(event) {
+    const { name, value } = event.target;
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+
+    if (!form.VesselID.trim()) {
+      setError("Vessel ID is required");
+      return;
+    }
+
+    if (!form.CustomerID.trim()) {
+      setError("Customer is required");
+      return;
+    }
 
     const payload = {
       ...form,
-      YearBuilt: form.YearBuilt === "" ? null : Number(form.YearBuilt),
-      LengthM: form.LengthM === "" ? null : Number(form.LengthM),
-      BeamM: form.BeamM === "" ? null : Number(form.BeamM),
-      PassengerCapacity: form.PassengerCapacity === "" ? null : Number(form.PassengerCapacity),
-      FuelTankL: form.FuelTankL === "" ? null : Number(form.FuelTankL)
+      YearBuilt:
+        form.YearBuilt === ""
+          ? null
+          : Number(form.YearBuilt),
+      LengthM:
+        form.LengthM === ""
+          ? null
+          : Number(form.LengthM),
+      BeamM:
+        form.BeamM === ""
+          ? null
+          : Number(form.BeamM),
+      PassengerCapacity:
+        form.PassengerCapacity === ""
+          ? null
+          : Number(form.PassengerCapacity),
+      FuelTankL:
+        form.FuelTankL === ""
+          ? null
+          : Number(form.FuelTankL),
     };
 
     try {
-      setSaving(true); setError(""); setSuccess("");
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
       if (editingId) {
-        await api.put(`/vessels/${encodeURIComponent(editingId)}`, payload);
+        await api.put(
+          `/vessels/${encodeURIComponent(editingId)}`,
+          payload
+        );
         setSuccess("Vessel updated successfully");
       } else {
         await api.post("/vessels", payload);
         setSuccess("Vessel created successfully");
       }
-      closeForm(); await loadData();
+
+      closeForm();
+      await loadData();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to save vessel");
-    } finally { setSaving(false); }
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to save vessel"
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget) {
+      return;
+    }
+
     try {
-      setDeleting(true); setError("");
-      await api.delete(`/vessels/${encodeURIComponent(deleteTarget.vessel_id)}`);
+      setDeleting(true);
+      setError("");
+
+      await api.delete(
+        `/vessels/${encodeURIComponent(
+          deleteTarget.vessel_id
+        )}`
+      );
+
       setSuccess("Vessel deleted successfully");
       setDeleteTarget(null);
       await loadData();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to delete vessel");
-    } finally { setDeleting(false); }
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to delete vessel"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function openActionMenu(event, vessel) {
+    setActionAnchor(event.currentTarget);
+    setActionVessel(vessel);
+  }
+
+  function closeActionMenu() {
+    setActionAnchor(null);
+    setActionVessel(null);
+  }
+
+  function handleEditFromMenu() {
+    if (actionVessel) {
+      openEdit(actionVessel);
+    }
+
+    closeActionMenu();
+  }
+
+  function handleDeleteFromMenu() {
+    if (actionVessel) {
+      setDeleteTarget(actionVessel);
+    }
+
+    closeActionMenu();
   }
 
   return (
-    <Box>
-      <Stack direction={{xs:"column",sm:"row"}} justifyContent="space-between" spacing={2} sx={{mb:3}}>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+      }}
+    >
+      <Stack
+        sx={{
+          flexDirection: {
+            xs: "column",
+            sm: "row",
+          },
+          justifyContent: "space-between",
+          alignItems: {
+            xs: "stretch",
+            sm: "center",
+          },
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <Box>
-          <Typography variant="h4" fontWeight={700}>Vessels</Typography>
-          <Typography color="text.secondary">Manage vessels and customer fleet assignments.</Typography>
+          <Typography
+            variant="h4"
+            sx={{ fontWeight: 700 }}
+          >
+            Vessels
+          </Typography>
+
+          <Typography color="text.secondary">
+            Manage vessels and customer fleet assignments.
+          </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon/>} onClick={openCreate}>Add vessel</Button>
+
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={openCreate}
+        >
+          Add vessel
+        </Button>
       </Stack>
 
-      {error && <Alert severity="error" onClose={()=>setError("")} sx={{mb:2}}>{error}</Alert>}
-      {success && <Alert severity="success" onClose={()=>setSuccess("")} sx={{mb:2}}>{success}</Alert>}
+      {error && (
+        <Alert
+          severity="error"
+          onClose={() => setError("")}
+          sx={{ mb: 2 }}
+        >
+          {error}
+        </Alert>
+      )}
 
-      <Paper sx={{p:2,mb:2}}>
-        <Stack direction={{xs:"column",sm:"row"}} spacing={2}>
-          <TextField fullWidth value={search} onChange={e=>setSearch(e.target.value)}
+      {success && (
+        <Alert
+          severity="success"
+          onClose={() => setSuccess("")}
+          sx={{ mb: 2 }}
+        >
+          {success}
+        </Alert>
+      )}
+
+      <Paper sx={{ p: 2, mb: 2, width: "100%", minWidth: 0, overflow: "hidden" }}>
+        <Stack
+          sx={{
+            flexDirection: {
+              xs: "column",
+              sm: "row",
+            },
+            alignItems: {
+              xs: "stretch",
+              sm: "center",
+            },
+            gap: 2,
+          }}
+        >
+          <TextField
+            fullWidth
+            size="small"
+            value={search}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
             placeholder="Search vessel, customer, builder, port..."
-            InputProps={{startAdornment:<InputAdornment position="start"><SearchIcon/></InputAdornment>}}/>
-          <Tooltip title="Refresh"><span><IconButton onClick={loadData} disabled={loading} color="primary"><RefreshIcon/></IconButton></span></Tooltip>
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+
+          <Tooltip title="Refresh">
+            <span>
+              <IconButton
+                onClick={loadData}
+                disabled={loading}
+                color="primary"
+              >
+                <RefreshIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
         </Stack>
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: "block",
+            mt: 1.25,
+          }}
+        >
+          Showing {filteredVessels.length} of{" "}
+          {vessels.length} vessels
+        </Typography>
       </Paper>
 
-      <TableContainer component={Paper}>
-        {loading ? <Box sx={{minHeight:260,display:"grid",placeItems:"center"}}><CircularProgress/></Box> :
-        <Table>
-          <TableHead><TableRow>
-            <TableCell>Vessel ID</TableCell><TableCell>Boat name</TableCell><TableCell>Customer</TableCell>
-            <TableCell>Builder</TableCell><TableCell>Year</TableCell><TableCell>Hull</TableCell>
-            <TableCell>Home port</TableCell><TableCell align="right">Length (m)</TableCell><TableCell align="right">Actions</TableCell>
-          </TableRow></TableHead>
-          <TableBody>
-            {filtered.map(v => <TableRow key={v.vessel_id} hover>
-              <TableCell>{v.vessel_id}</TableCell>
-              <TableCell><Typography fontWeight={600}>{v.boat_name || "Unnamed vessel"}</Typography>
-                <Typography variant="caption" color="text.secondary">{v.hull_type || "—"}</Typography></TableCell>
-              <TableCell>{v.company || customerMap.get(v.customer_id) || v.customer_id || "—"}</TableCell>
-              <TableCell>{v.builder || "—"}</TableCell><TableCell>{v.year_built ?? "—"}</TableCell>
-              <TableCell>{[v.hull_material,v.hull_type].filter(Boolean).join(" / ") || "—"}</TableCell>
-              <TableCell>{v.home_port || "—"}</TableCell><TableCell align="right">{v.length_m ?? "—"}</TableCell>
-              <TableCell align="right">
-                <Tooltip title="Edit"><IconButton color="primary" onClick={()=>openEdit(v)}><EditIcon/></IconButton></Tooltip>
-                <Tooltip title="Delete"><IconButton color="error" onClick={()=>setDeleteTarget(v)}><DeleteIcon/></IconButton></Tooltip>
-              </TableCell>
-            </TableRow>)}
-            {!filtered.length && <TableRow><TableCell colSpan={9} align="center">No vessels found.</TableCell></TableRow>}
-          </TableBody>
-        </Table>}
-      </TableContainer>
+      <Paper
+        sx={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
+        <TableContainer
+          sx={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            overflowX: "hidden",
+          }}
+        >
+          {loading ? (
+            <Box
+              sx={{
+                minHeight: 260,
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Table
+              size="small"
+              sx={{
+                width: "100%",
+                tableLayout: "fixed",
+              }}
+            >
+              <TableHead>
+                <TableRow>
+                  {sortableColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      align={column.numeric ? "right" : "left"}
+                      sx={{
+                        display:
+                          column.id === "vessel_id"
+                            ? {
+                                xs: "none",
+                                sm: "table-cell",
+                              }
+                            : column.id === "customer_name"
+                              ? {
+                                  xs: "none",
+                                  sm: "table-cell",
+                                }
+                              : column.id === "year_built"
+                                ? {
+                                    xs: "none",
+                                    md: "table-cell",
+                                  }
+                                : "table-cell",
+                        width:
+                          column.id === "boat_name"
+                            ? { xs: "auto", sm: 180 }
+                            : column.id === "length_m"
+                              ? { xs: 72, sm: 90 }
+                              : undefined,
+                        px: { xs: 1, sm: 2 },
+                      }}
+                    >
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={
+                          orderBy === column.id
+                            ? order
+                            : "asc"
+                        }
+                        onClick={() =>
+                          handleSort(column.id)
+                        }
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
 
-      <Dialog open={formOpen} onClose={closeForm} fullWidth maxWidth="md">
-        <Box component="form" onSubmit={submit}>
-          <DialogTitle>{editingId ? "Edit vessel" : "Add vessel"}</DialogTitle>
+                  <TableCell
+                    sx={{
+                      display: {
+                        xs: "none",
+                        lg: "table-cell",
+                      },
+                    }}
+                  >
+                    Builder
+                  </TableCell>
+
+                  <TableCell
+                    sx={{
+                      display: {
+                        xs: "none",
+                        lg: "table-cell",
+                      },
+                    }}
+                  >
+                    Hull
+                  </TableCell>
+
+                  <TableCell
+                    sx={{
+                      display: {
+                        xs: "none",
+                        md: "table-cell",
+                      },
+                    }}
+                  >
+                    Home port
+                  </TableCell>
+
+                  <TableCell
+                    align="right"
+                    sx={{
+                      width: { xs: 48, sm: 72 },
+                      px: { xs: 0.5, sm: 2 },
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", sm: "inline" } }}
+                    >
+                      Actions
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {visibleVessels.map((vessel) => (
+                  <TableRow
+                    key={vessel.vessel_id}
+                    hover
+                  >
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          sm: "table-cell",
+                        },
+                      }}
+                    >
+                      {vessel.vessel_id}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        minWidth: 0,
+                        px: { xs: 1, sm: 2 },
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {vessel.boat_name ||
+                          "Unnamed vessel"}
+                      </Typography>
+
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        noWrap
+                        sx={{ display: "block" }}
+                      >
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "inline", sm: "none" } }}
+                        >
+                          {vessel.customer_name || "No customer"}
+                          {vessel.hull_type
+                            ? ` • ${vessel.hull_type}`
+                            : ""}
+                        </Box>
+
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "none", sm: "inline" } }}
+                        >
+                          {vessel.hull_type || "—"}
+                        </Box>
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          sm: "table-cell",
+                        },
+                      }}
+                    >
+                      {vessel.customer_name || "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          md: "table-cell",
+                        },
+                      }}
+                    >
+                      {vessel.year_built ?? "—"}
+                    </TableCell>
+
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 72, sm: 90 },
+                        px: { xs: 1, sm: 2 },
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {vessel.length_m ?? "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          lg: "table-cell",
+                        },
+                      }}
+                    >
+                      {vessel.builder || "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          lg: "table-cell",
+                        },
+                      }}
+                    >
+                      {[vessel.hull_material, vessel.hull_type]
+                        .filter(Boolean)
+                        .join(" / ") || "—"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
+                          md: "table-cell",
+                        },
+                      }}
+                    >
+                      {vessel.home_port || "—"}
+                    </TableCell>
+
+                    <TableCell
+                      align="right"
+                      sx={{
+                        width: { xs: 48, sm: 72 },
+                        px: { xs: 0.5, sm: 2 },
+                      }}
+                    >
+                      <Tooltip title="Vessel actions">
+                        <IconButton
+                          size="small"
+                          onClick={(event) =>
+                            openActionMenu(event, vessel)
+                          }
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {!visibleVessels.length && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      align="center"
+                      sx={{ py: 5 }}
+                    >
+                      No vessels found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
+
+        {!loading && (
+          <TablePagination
+            component="div"
+            count={sortedVessels.length}
+            sx={{
+              width: "100%",
+              maxWidth: "100%",
+              overflow: "hidden",
+              "& .MuiTablePagination-toolbar": {
+                minHeight: 52,
+                px: { xs: 1, sm: 2 },
+              },
+              "& .MuiTablePagination-spacer": {
+                display: { xs: "none", sm: "block" },
+              },
+              "& .MuiTablePagination-selectLabel": {
+                display: { xs: "none", sm: "block" },
+              },
+              "& .MuiTablePagination-select": {
+                display: { xs: "none", sm: "inline-flex" },
+              },
+              "& .MuiTablePagination-displayedRows": {
+                ml: { xs: 0, sm: 2 },
+                whiteSpace: "nowrap",
+              },
+              "& .MuiTablePagination-actions": {
+                ml: { xs: "auto", sm: 2 },
+              },
+            }}
+            page={page}
+            onPageChange={(_event, nextPage) =>
+              setPage(nextPage)
+            }
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(
+                Number(event.target.value)
+              );
+              setPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
+        )}
+      </Paper>
+
+      <Menu
+        anchorEl={actionAnchor}
+        open={Boolean(actionAnchor)}
+        onClose={closeActionMenu}
+      >
+        <MenuItem onClick={handleEditFromMenu}>
+          <EditIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Edit
+        </MenuItem>
+
+        <MenuItem
+          onClick={handleDeleteFromMenu}
+          sx={{ color: "error.main" }}
+        >
+          <DeleteIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Delete
+        </MenuItem>
+      </Menu>
+
+      <Dialog
+        open={formOpen}
+        onClose={closeForm}
+        fullWidth
+        maxWidth="md"
+      >
+        <Box
+          component="form"
+          onSubmit={submit}
+        >
+          <DialogTitle>
+            {editingId ? "Edit vessel" : "Add vessel"}
+          </DialogTitle>
+
           <DialogContent dividers>
-            <Box sx={{display:"grid",gridTemplateColumns:{xs:"1fr",sm:"1fr 1fr"},gap:2,pt:1}}>
-              <TextField label="Vessel ID" name="VesselID" value={form.VesselID} onChange={change} required disabled={Boolean(editingId)}/>
-              <TextField select label="Customer" name="CustomerID" value={form.CustomerID} onChange={change} required>
-                {customers.map(c=><MenuItem key={c.customer_id} value={c.customer_id}>{c.company || c.customer_id} — {c.customer_id}</MenuItem>)}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "1fr 1fr",
+                },
+                gap: 2,
+                pt: 1,
+              }}
+            >
+              <TextField
+                label="Vessel ID"
+                name="VesselID"
+                value={form.VesselID}
+                onChange={change}
+                required
+                disabled={Boolean(editingId)}
+              />
+
+              <TextField
+                select
+                label="Customer"
+                name="CustomerID"
+                value={form.CustomerID}
+                onChange={change}
+                required
+              >
+                {customers.map((customer) => (
+                  <MenuItem
+                    key={customer.customer_id}
+                    value={customer.customer_id}
+                  >
+                    {customer.company ||
+                      customer.customer_id}{" "}
+                    — {customer.customer_id}
+                  </MenuItem>
+                ))}
               </TextField>
-              <TextField label="Boat name" name="BoatName" value={form.BoatName} onChange={change}/>
-              <TextField label="Builder" name="Builder" value={form.Builder} onChange={change}/>
-              <TextField label="Year built" name="YearBuilt" type="number" value={form.YearBuilt} onChange={change}/>
-              <TextField label="Length (m)" name="LengthM" type="number" value={form.LengthM} onChange={change} inputProps={{min:0,step:"any"}}/>
-              <TextField label="Beam (m)" name="BeamM" type="number" value={form.BeamM} onChange={change} inputProps={{min:0,step:"any"}}/>
-              <TextField select label="Hull material" name="HullMaterial" value={form.HullMaterial} onChange={change}>
-                <MenuItem value=""><em>None</em></MenuItem>{hullMaterials.map(x=><MenuItem key={x} value={x}>{x}</MenuItem>)}
+
+              <TextField
+                label="Boat name"
+                name="BoatName"
+                value={form.BoatName}
+                onChange={change}
+              />
+
+              <TextField
+                label="Builder"
+                name="Builder"
+                value={form.Builder}
+                onChange={change}
+              />
+
+              <TextField
+                label="Year built"
+                name="YearBuilt"
+                type="number"
+                value={form.YearBuilt}
+                onChange={change}
+              />
+
+              <TextField
+                label="Length (m)"
+                name="LengthM"
+                type="number"
+                value={form.LengthM}
+                onChange={change}
+                slotProps={{
+                  htmlInput: {
+                    min: 0,
+                    step: "any",
+                  },
+                }}
+              />
+
+              <TextField
+                label="Beam (m)"
+                name="BeamM"
+                type="number"
+                value={form.BeamM}
+                onChange={change}
+                slotProps={{
+                  htmlInput: {
+                    min: 0,
+                    step: "any",
+                  },
+                }}
+              />
+
+              <TextField
+                select
+                label="Hull material"
+                name="HullMaterial"
+                value={form.HullMaterial}
+                onChange={change}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+
+                {hullMaterials.map((material) => (
+                  <MenuItem
+                    key={material}
+                    value={material}
+                  >
+                    {material}
+                  </MenuItem>
+                ))}
               </TextField>
-              <TextField select label="Hull type" name="HullType" value={form.HullType} onChange={change}>
-                <MenuItem value=""><em>None</em></MenuItem>{hullTypes.map(x=><MenuItem key={x} value={x}>{x}</MenuItem>)}
+
+              <TextField
+                select
+                label="Hull type"
+                name="HullType"
+                value={form.HullType}
+                onChange={change}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+
+                {hullTypes.map((type) => (
+                  <MenuItem
+                    key={type}
+                    value={type}
+                  >
+                    {type}
+                  </MenuItem>
+                ))}
               </TextField>
-              <TextField label="Passenger capacity" name="PassengerCapacity" type="number" value={form.PassengerCapacity} onChange={change}/>
-              <TextField label="Fuel tank (L)" name="FuelTankL" type="number" value={form.FuelTankL} onChange={change}/>
-              <TextField label="Home port" name="HomePort" value={form.HomePort} onChange={change}/>
-              <TextField label="Typical route" name="TypicalRoute" value={form.TypicalRoute} onChange={change} multiline minRows={3} sx={{gridColumn:{sm:"1 / -1"}}}/>
+
+              <TextField
+                label="Passenger capacity"
+                name="PassengerCapacity"
+                type="number"
+                value={form.PassengerCapacity}
+                onChange={change}
+              />
+
+              <TextField
+                label="Fuel tank (L)"
+                name="FuelTankL"
+                type="number"
+                value={form.FuelTankL}
+                onChange={change}
+              />
+
+              <TextField
+                label="Home port"
+                name="HomePort"
+                value={form.HomePort}
+                onChange={change}
+              />
+
+              <TextField
+                label="Typical route"
+                name="TypicalRoute"
+                value={form.TypicalRoute}
+                onChange={change}
+                multiline
+                minRows={3}
+                sx={{
+                  gridColumn: {
+                    sm: "1 / -1",
+                  },
+                }}
+              />
             </Box>
           </DialogContent>
+
           <DialogActions>
-            <Button onClick={closeForm} disabled={saving}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={saving}>
-              {saving ? "Saving..." : editingId ? "Update vessel" : "Create vessel"}
+            <Button
+              onClick={closeForm}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={saving}
+            >
+              {saving
+                ? "Saving..."
+                : editingId
+                  ? "Update vessel"
+                  : "Create vessel"}
             </Button>
           </DialogActions>
         </Box>
@@ -216,10 +1109,17 @@ export default function Vessels() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Delete vessel"
-        message={deleteTarget ? `Delete ${deleteTarget.boat_name || deleteTarget.vessel_id} (${deleteTarget.vessel_id})? This action cannot be undone.` : ""}
+        message={
+          deleteTarget
+            ? `Delete ${
+                deleteTarget.boat_name ||
+                deleteTarget.vessel_id
+              } (${deleteTarget.vessel_id})? This action cannot be undone.`
+            : ""
+        }
         confirmLabel="Delete"
         loading={deleting}
-        onCancel={()=>setDeleteTarget(null)}
+        onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
     </Box>

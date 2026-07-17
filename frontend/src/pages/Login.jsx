@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -22,9 +22,11 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (isAuthenticated) {
-    navigate("/", { replace: true });
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -59,7 +61,11 @@ export default function Login() {
       <Container maxWidth="sm">
         <Card elevation={12}>
           <CardContent sx={{ p: 4 }}>
-            <Typography variant="h4" fontWeight={700} gutterBottom>
+            <Typography
+              variant="h4"
+              gutterBottom
+              sx={{ fontWeight: 700 }}
+            >
               MII CRM
             </Typography>
 
