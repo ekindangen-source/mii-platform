@@ -38,7 +38,6 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  VesselID: "",
   CustomerID: "",
   BoatName: "",
   Builder: "",
@@ -80,7 +79,6 @@ const sortableColumns = [
 
 function mapRow(row) {
   return {
-    VesselID: row.vessel_id || "",
     CustomerID: row.customer_id || "",
     BoatName: row.boat_name || "",
     Builder: row.builder || "",
@@ -288,11 +286,6 @@ export default function Vessels() {
   async function submit(event) {
     event.preventDefault();
 
-    if (!form.VesselID.trim()) {
-      setError("Vessel ID is required");
-      return;
-    }
-
     if (!form.CustomerID.trim()) {
       setError("Customer is required");
       return;
@@ -334,8 +327,15 @@ export default function Vessels() {
         );
         setSuccess("Vessel updated successfully");
       } else {
-        await api.post("/vessels", payload);
-        setSuccess("Vessel created successfully");
+        const response = await api.post("/vessels", payload);
+        const generatedId =
+          response.data?.vessel?.vessel_id;
+
+        setSuccess(
+          generatedId
+            ? `Vessel ${generatedId} created successfully`
+            : "Vessel created successfully"
+        );
       }
 
       closeForm();
@@ -407,14 +407,7 @@ export default function Vessels() {
   }
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        overflowX: "hidden",
-      }}
-    >
+    <Box>
       <Stack
         sx={{
           flexDirection: {
@@ -472,7 +465,7 @@ export default function Vessels() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2, width: "100%", minWidth: 0, overflow: "hidden" }}>
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
           sx={{
             flexDirection: {
@@ -531,22 +524,8 @@ export default function Vessels() {
         </Typography>
       </Paper>
 
-      <Paper
-        sx={{
-          width: "100%",
-          maxWidth: "100%",
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
-        <TableContainer
-          sx={{
-            width: "100%",
-            maxWidth: "100%",
-            minWidth: 0,
-            overflowX: "hidden",
-          }}
-        >
+      <Paper>
+        <TableContainer>
           {loading ? (
             <Box
               sx={{
@@ -558,13 +537,7 @@ export default function Vessels() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table
-              size="small"
-              sx={{
-                width: "100%",
-                tableLayout: "fixed",
-              }}
-            >
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -573,29 +546,17 @@ export default function Vessels() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "vessel_id"
+                          column.id === "customer_name"
                             ? {
                                 xs: "none",
                                 sm: "table-cell",
                               }
-                            : column.id === "customer_name"
+                            : column.id === "year_built"
                               ? {
                                   xs: "none",
-                                  sm: "table-cell",
+                                  md: "table-cell",
                                 }
-                              : column.id === "year_built"
-                                ? {
-                                    xs: "none",
-                                    md: "table-cell",
-                                  }
-                                : "table-cell",
-                        width:
-                          column.id === "boat_name"
-                            ? { xs: "auto", sm: 180 }
-                            : column.id === "length_m"
-                              ? { xs: 72, sm: 90 }
-                              : undefined,
-                        px: { xs: 1, sm: 2 },
+                              : "table-cell",
                       }}
                     >
                       <TableSortLabel
@@ -647,20 +608,8 @@ export default function Vessels() {
                     Home port
                   </TableCell>
 
-                  <TableCell
-                    align="right"
-                    sx={{
-                      width: { xs: 48, sm: 72 },
-                      px: { xs: 0.5, sm: 2 },
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", sm: "inline" } }}
-                    >
-                      Actions
-                    </Box>
+                  <TableCell align="right">
+                    Actions
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -671,26 +620,13 @@ export default function Vessels() {
                     key={vessel.vessel_id}
                     hover
                   >
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          sm: "table-cell",
-                        },
-                      }}
-                    >
+                    <TableCell>
                       {vessel.vessel_id}
                     </TableCell>
 
-                    <TableCell
-                      sx={{
-                        minWidth: 0,
-                        px: { xs: 1, sm: 2 },
-                      }}
-                    >
+                    <TableCell>
                       <Typography
                         variant="body2"
-                        noWrap
                         sx={{ fontWeight: 600 }}
                       >
                         {vessel.boat_name ||
@@ -700,25 +636,8 @@ export default function Vessels() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        noWrap
-                        sx={{ display: "block" }}
                       >
-                        <Box
-                          component="span"
-                          sx={{ display: { xs: "inline", sm: "none" } }}
-                        >
-                          {vessel.customer_name || "No customer"}
-                          {vessel.hull_type
-                            ? ` • ${vessel.hull_type}`
-                            : ""}
-                        </Box>
-
-                        <Box
-                          component="span"
-                          sx={{ display: { xs: "none", sm: "inline" } }}
-                        >
-                          {vessel.hull_type || "—"}
-                        </Box>
+                        {vessel.hull_type || "—"}
                       </Typography>
                     </TableCell>
 
@@ -744,14 +663,7 @@ export default function Vessels() {
                       {vessel.year_built ?? "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        width: { xs: 72, sm: 90 },
-                        px: { xs: 1, sm: 2 },
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <TableCell align="right">
                       {vessel.length_m ?? "—"}
                     </TableCell>
 
@@ -790,13 +702,7 @@ export default function Vessels() {
                       {vessel.home_port || "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        width: { xs: 48, sm: 72 },
-                        px: { xs: 0.5, sm: 2 },
-                      }}
-                    >
+                    <TableCell align="right">
                       <Tooltip title="Vessel actions">
                         <IconButton
                           size="small"
@@ -831,31 +737,6 @@ export default function Vessels() {
           <TablePagination
             component="div"
             count={sortedVessels.length}
-            sx={{
-              width: "100%",
-              maxWidth: "100%",
-              overflow: "hidden",
-              "& .MuiTablePagination-toolbar": {
-                minHeight: 52,
-                px: { xs: 1, sm: 2 },
-              },
-              "& .MuiTablePagination-spacer": {
-                display: { xs: "none", sm: "block" },
-              },
-              "& .MuiTablePagination-selectLabel": {
-                display: { xs: "none", sm: "block" },
-              },
-              "& .MuiTablePagination-select": {
-                display: { xs: "none", sm: "inline-flex" },
-              },
-              "& .MuiTablePagination-displayedRows": {
-                ml: { xs: 0, sm: 2 },
-                whiteSpace: "nowrap",
-              },
-              "& .MuiTablePagination-actions": {
-                ml: { xs: "auto", sm: 2 },
-              },
-            }}
             page={page}
             onPageChange={(_event, nextPage) =>
               setPage(nextPage)
@@ -923,14 +804,6 @@ export default function Vessels() {
                 pt: 1,
               }}
             >
-              <TextField
-                label="Vessel ID"
-                name="VesselID"
-                value={form.VesselID}
-                onChange={change}
-                required
-                disabled={Boolean(editingId)}
-              />
 
               <TextField
                 select

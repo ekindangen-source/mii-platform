@@ -9,7 +9,6 @@ router.post("/", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO engines
       (
-        engine_id,
         vessel_id,
         brand,
         model,
@@ -22,11 +21,9 @@ router.post("/", async (req, res) => {
         warranty_expiry,
         fuel_type
       )
-      VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       RETURNING *`,
       [
-        r.EngineID,
         r.VesselID,
         r.Brand,
         r.Model,
@@ -37,61 +34,46 @@ router.post("/", async (req, res) => {
         r.GearRatio,
         r.Propeller,
         r.WarrantyExpiry || null,
-        r.FuelType
+        r.FuelType,
       ]
     );
 
-    res.json({
+    res.status(201).json({
       status: "OK",
-      engine: result.rows[0]
+      engine: result.rows[0],
     });
-
   } catch (err) {
-
     res.status(500).json({
       status: "ERROR",
-      message: err.message
+      message: err.message,
     });
-
   }
 });
 
-
-router.get("/", async (req, res) => {
-
+router.get("/", async (_req, res) => {
   try {
-
     const result = await pool.query(
-
       `SELECT
-          e.*,
-          v.boat_name,
-          c.company
+         e.*,
+         v.boat_name,
+         c.company
        FROM engines e
        LEFT JOIN vessels v
-            ON e.vessel_id=v.vessel_id
+         ON e.vessel_id = v.vessel_id
        LEFT JOIN customers c
-            ON v.customer_id=c.customer_id
+         ON v.customer_id = c.customer_id
        ORDER BY e.created_at DESC
        LIMIT 100`
-
     );
 
     res.json(result.rows);
-
-  } catch(err){
-
+  } catch (err) {
     res.status(500).json({
-        status:"ERROR",
-        message:err.message
+      status: "ERROR",
+      message: err.message,
     });
-
   }
-
 });
-
-
-// EDIT ENGINE
 
 router.put("/:id", async (req, res) => {
   try {
@@ -100,19 +82,19 @@ router.put("/:id", async (req, res) => {
     const result = await pool.query(
       `UPDATE engines
        SET
-         vessel_id = $1,
-         brand = $2,
-         model = $3,
-         hp = $4,
-         serial_number = $5,
-         install_date = $6,
-         engine_hours = $7,
-         gear_ratio = $8,
-         propeller = $9,
-         warranty_expiry = $10,
-         fuel_type = $11,
-         updated_at = NOW()
-       WHERE engine_id = $12
+         vessel_id=$1,
+         brand=$2,
+         model=$3,
+         hp=$4,
+         serial_number=$5,
+         install_date=$6,
+         engine_hours=$7,
+         gear_ratio=$8,
+         propeller=$9,
+         warranty_expiry=$10,
+         fuel_type=$11,
+         updated_at=NOW()
+       WHERE engine_id=$12
        RETURNING *`,
       [
         r.VesselID,
@@ -126,36 +108,34 @@ router.put("/:id", async (req, res) => {
         r.Propeller,
         r.WarrantyExpiry || null,
         r.FuelType,
-        req.params.id
+        req.params.id,
       ]
     );
 
     if (result.rowCount === 0) {
       return res.status(404).json({
         status: "ERROR",
-        message: "Engine not found"
+        message: "Engine not found",
       });
     }
 
     res.json({
       status: "OK",
-      engine: result.rows[0]
+      engine: result.rows[0],
     });
   } catch (err) {
     res.status(500).json({
       status: "ERROR",
-      message: err.message
+      message: err.message,
     });
   }
 });
 
-
-// DELETE ENGINE
 router.delete("/:id", async (req, res) => {
   try {
     const result = await pool.query(
       `DELETE FROM engines
-       WHERE engine_id = $1
+       WHERE engine_id=$1
        RETURNING *`,
       [req.params.id]
     );
@@ -163,19 +143,19 @@ router.delete("/:id", async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({
         status: "ERROR",
-        message: "Engine not found"
+        message: "Engine not found",
       });
     }
 
     res.json({
       status: "OK",
       message: "Engine deleted",
-      engine: result.rows[0]
+      engine: result.rows[0],
     });
   } catch (err) {
     res.status(500).json({
       status: "ERROR",
-      message: err.message
+      message: err.message,
     });
   }
 });

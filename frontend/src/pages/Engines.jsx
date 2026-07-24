@@ -38,7 +38,6 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  EngineID: "",
   VesselID: "",
   Brand: "",
   Model: "",
@@ -89,7 +88,6 @@ function formatDate(value) {
 
 function mapRowToForm(row) {
   return {
-    EngineID: row.engine_id || "",
     VesselID: row.vessel_id || "",
     Brand: row.brand || "",
     Model: row.model || "",
@@ -304,10 +302,6 @@ export default function Engines() {
   }
 
   function validateForm() {
-    if (!form.EngineID.trim()) {
-      return "Engine ID is required";
-    }
-
     if (!form.VesselID.trim()) {
       return "Vessel is required";
     }
@@ -371,8 +365,15 @@ export default function Engines() {
 
         setSuccess("Engine updated successfully");
       } else {
-        await api.post("/engines", payload);
-        setSuccess("Engine created successfully");
+        const response = await api.post("/engines", payload);
+        const generatedId =
+          response.data?.engine?.engine_id;
+
+        setSuccess(
+          generatedId
+            ? `Engine ${generatedId} created successfully`
+            : "Engine created successfully"
+        );
       }
 
       setFormOpen(false);
@@ -449,14 +450,7 @@ export default function Engines() {
   }
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        overflowX: "hidden",
-      }}
-    >
+    <Box>
       <Stack
         sx={{
           flexDirection: {
@@ -514,16 +508,7 @@ export default function Engines() {
         </Alert>
       )}
 
-      <Paper
-        sx={{
-          p: { xs: 1.5, sm: 2 },
-          mb: 2,
-          width: "100%",
-          maxWidth: "100%",
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
           sx={{
             flexDirection: {
@@ -582,21 +567,8 @@ export default function Engines() {
         </Typography>
       </Paper>
 
-      <Paper
-        sx={{
-          width: "100%",
-          maxWidth: "100%",
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
-        <TableContainer
-          sx={{
-            width: "100%",
-            maxWidth: "100%",
-            overflowX: { xs: "hidden", sm: "auto" },
-          }}
-        >
+      <Paper>
+        <TableContainer>
           {loading ? (
             <Box
               sx={{
@@ -608,13 +580,7 @@ export default function Engines() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table
-              size="small"
-              sx={{
-                width: "100%",
-                tableLayout: { xs: "fixed", sm: "auto" },
-              }}
-            >
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -623,31 +589,17 @@ export default function Engines() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "engine_id"
+                          column.id === "vessel_name"
                             ? {
                                 xs: "none",
                                 sm: "table-cell",
                               }
-                            : column.id === "vessel_name"
+                            : column.id === "engine_hours"
                               ? {
                                   xs: "none",
-                                  sm: "table-cell",
+                                  md: "table-cell",
                                 }
-                              : column.id === "engine_hours"
-                                ? {
-                                    xs: "none",
-                                    md: "table-cell",
-                                  }
-                                : "table-cell",
-                        ...(column.id === "engine_name" && {
-                          width: { xs: "auto", sm: "auto" },
-                          pl: { xs: 1.5, sm: 2 },
-                          pr: { xs: 0.5, sm: 2 },
-                        }),
-                        ...(column.id === "hp" && {
-                          width: { xs: 58, sm: "auto" },
-                          px: { xs: 0.5, sm: 2 },
-                        }),
+                              : "table-cell",
                       }}
                     >
                       <TableSortLabel
@@ -699,20 +651,8 @@ export default function Engines() {
                     Fuel type
                   </TableCell>
 
-                  <TableCell
-                    align="right"
-                    sx={{
-                      width: { xs: 48, sm: "auto" },
-                      px: { xs: 0.5, sm: 2 },
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", sm: "inline" } }}
-                    >
-                      Actions
-                    </Box>
+                  <TableCell align="right">
+                    Actions
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -723,33 +663,14 @@ export default function Engines() {
                     key={engine.engine_id}
                     hover
                   >
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          sm: "table-cell",
-                        },
-                      }}
-                    >
+                    <TableCell>
                       {engine.engine_id}
                     </TableCell>
 
-                    <TableCell
-                      sx={{
-                        minWidth: 0,
-                        pl: { xs: 1.5, sm: 2 },
-                        pr: { xs: 0.5, sm: 2 },
-                        overflow: "hidden",
-                      }}
-                    >
+                    <TableCell>
                       <Typography
                         variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
+                        sx={{ fontWeight: 600 }}
                       >
                         {engine.engine_name}
                       </Typography>
@@ -757,22 +678,6 @@ export default function Engines() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{
-                          display: "block",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {engine.vessel_name || "No vessel assigned"}
-                      </Typography>
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          display: { xs: "none", sm: "block" },
-                        }}
                       >
                         {engine.install_date
                           ? `Installed ${formatDate(
@@ -793,14 +698,7 @@ export default function Engines() {
                       {engine.vessel_name || "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        width: { xs: 58, sm: "auto" },
-                        px: { xs: 0.5, sm: 2 },
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <TableCell align="right">
                       {engine.hp ?? "—"}
                     </TableCell>
 
@@ -849,14 +747,7 @@ export default function Engines() {
                       {engine.fuel_type || "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        width: { xs: 48, sm: "auto" },
-                        px: { xs: 0.5, sm: 2 },
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <TableCell align="right">
                       <Tooltip title="Engine actions">
                         <IconButton
                           size="small"
@@ -890,30 +781,6 @@ export default function Engines() {
         {!loading && (
           <TablePagination
             component="div"
-            sx={{
-              width: "100%",
-              maxWidth: "100%",
-              overflow: "hidden",
-              "& .MuiTablePagination-toolbar": {
-                minHeight: 52,
-                px: { xs: 0.5, sm: 2 },
-                gap: { xs: 0, sm: 1 },
-              },
-              "& .MuiTablePagination-selectLabel": {
-                display: { xs: "none", sm: "block" },
-              },
-              "& .MuiTablePagination-displayedRows": {
-                ml: { xs: 0, sm: 1 },
-                fontSize: { xs: "0.75rem", sm: "0.875rem" },
-              },
-              "& .MuiTablePagination-actions": {
-                ml: { xs: 0, sm: 2 },
-              },
-              "& .MuiTablePagination-select": {
-                pl: { xs: 0, sm: 1 },
-                pr: { xs: 2, sm: 3 },
-              },
-            }}
             count={sortedEngines.length}
             page={page}
             onPageChange={(_event, nextPage) =>
@@ -982,14 +849,6 @@ export default function Engines() {
                 pt: 1,
               }}
             >
-              <TextField
-                label="Engine ID"
-                name="EngineID"
-                value={form.EngineID}
-                onChange={handleChange}
-                required
-                disabled={Boolean(editingId)}
-              />
 
               <TextField
                 select

@@ -18,7 +18,7 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  TripID: "", VesselID: "", Date: "", Captain: "",
+  VesselID: "", Date: "", Captain: "",
   OperatingHours: "", DistanceNM: "", AverageSpeedKn: "",
   FuelUsedL: "", FuelPricePerL: "", ElectricityKWh: "",
   Weather: "", SeaState: "", Payload: ""
@@ -41,7 +41,6 @@ function formatDate(value) {
 
 function mapRowToForm(row) {
   return {
-    TripID: row.trip_id || "",
     VesselID: row.vessel_id || "",
     Date: formatDate(row.trip_date),
     Captain: row.captain || "",
@@ -207,7 +206,6 @@ export default function Trips() {
   }
 
   function validateForm() {
-    if (!form.TripID.trim()) return "Trip ID is required";
     if (!form.VesselID.trim()) return "Vessel is required";
     if (!form.Date) return "Trip date is required";
     if (form.OperatingHours !== "" && Number(form.OperatingHours) <= 0) {
@@ -259,8 +257,15 @@ export default function Trips() {
         await api.put(`/trips/${encodeURIComponent(editingId)}`, payload);
         setSuccess("Trip updated successfully");
       } else {
-        await api.post("/trips", payload);
-        setSuccess("Trip created successfully");
+        const response = await api.post("/trips", payload);
+        const generatedId =
+          response.data?.trip?.trip_id;
+
+        setSuccess(
+          generatedId
+            ? `Trip ${generatedId} created successfully`
+            : "Trip created successfully"
+        );
       }
 
       setFormOpen(false);
@@ -418,7 +423,7 @@ export default function Trips() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "trip_date"
+                          column.id === "vessel_name"
                             ? { xs: "none", sm: "table-cell" }
                             : column.id === "distance_nm"
                               ? { xs: "none", md: "table-cell" }
@@ -551,14 +556,6 @@ export default function Trips() {
               gap: 2,
               pt: 1,
             }}>
-              <TextField
-                label="Trip ID"
-                name="TripID"
-                value={form.TripID}
-                onChange={handleChange}
-                required
-                disabled={Boolean(editingId)}
-              />
 
               <TextField
                 select

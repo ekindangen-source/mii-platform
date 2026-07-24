@@ -2,22 +2,33 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/database");
 
-//-----------------
-//Customers
-//-----------------
-
+// CREATE CUSTOMER
 router.post("/", async (req, res) => {
   try {
     const r = req.body;
 
     const result = await pool.query(
       `INSERT INTO customers
-      (customer_id, company, industry, contact_person, position, province, home_port,
-       fleet_size, annual_operating_hours, decision_maker, current_supplier, email, telephone, address, notes)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      (
+        company,
+        industry,
+        contact_person,
+        position,
+        province,
+        home_port,
+        fleet_size,
+        annual_operating_hours,
+        decision_maker,
+        current_supplier,
+        email,
+        telephone,
+        address,
+        notes
+      )
+      VALUES
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING *`,
       [
-        r.CustomerID,
         r.Company,
         r.Industry,
         r.ContactPerson,
@@ -28,28 +39,40 @@ router.post("/", async (req, res) => {
         r.AnnualOperatingHours || null,
         r.DecisionMaker,
         r.CurrentSupplier,
-	r.Email,
-	r.Telephone,
-	r.Address,
-        r.Notes
+        r.Email,
+        r.Telephone,
+        r.Address,
+        r.Notes,
       ]
     );
 
-    res.json({ status: "OK", customer: result.rows[0] });
+    res.status(201).json({
+      status: "OK",
+      customer: result.rows[0],
+    });
   } catch (err) {
-    res.status(500).json({ status: "ERROR", message: err.message });
+    res.status(500).json({
+      status: "ERROR",
+      message: err.message,
+    });
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM customers ORDER BY created_at DESC LIMIT 100"
+      `SELECT *
+       FROM customers
+       ORDER BY created_at DESC
+       LIMIT 100`
     );
 
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ status: "ERROR", message: err.message });
+    res.status(500).json({
+      status: "ERROR",
+      message: err.message,
+    });
   }
 });
 
@@ -92,25 +115,25 @@ router.put("/:id", async (req, res) => {
         r.Telephone,
         r.Address,
         r.Notes,
-        req.params.id
+        req.params.id,
       ]
     );
 
     if (result.rowCount === 0) {
       return res.status(404).json({
         status: "ERROR",
-        message: "Customer not found"
+        message: "Customer not found",
       });
     }
 
     res.json({
       status: "OK",
-      customer: result.rows[0]
+      customer: result.rows[0],
     });
   } catch (err) {
     res.status(500).json({
       status: "ERROR",
-      message: err.message
+      message: err.message,
     });
   }
 });
@@ -127,19 +150,19 @@ router.delete("/:id", async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({
         status: "ERROR",
-        message: "Customer not found"
+        message: "Customer not found",
       });
     }
 
     res.json({
       status: "OK",
       message: "Customer deleted",
-      customer: result.rows[0]
+      customer: result.rows[0],
     });
   } catch (err) {
     res.status(500).json({
       status: "ERROR",
-      message: err.message
+      message: err.message,
     });
   }
 });

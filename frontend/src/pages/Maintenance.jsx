@@ -19,7 +19,7 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  MaintenanceID: "", EngineID: "", ServiceDate: "",
+  EngineID: "", ServiceDate: "",
   EngineHours: "", ServiceType: "", Technician: "",
   PartsReplaced: "", LaborHours: "", LaborCost: "",
   PartsCost: "", DowntimeHours: "", WarrantyClaim: "No",
@@ -40,7 +40,7 @@ const warrantyOptions = ["No", "Yes", "Pending"];
 const sortableColumns = [
   { id: "maintenance_id", label: "Maintenance ID" },
   { id: "service_date", label: "Date" },
-  { id: "engine_name", label: "Service / Engine" },
+  { id: "engine_name", label: "Engine" },
   { id: "status", label: "Status" },
   { id: "engine_hours", label: "Engine hours", numeric: true },
   { id: "total_cost", label: "Total cost", numeric: true },
@@ -79,7 +79,6 @@ function statusColor(status) {
 
 function mapRowToForm(row) {
   return {
-    MaintenanceID: row.maintenance_id || "",
     EngineID: row.engine_id || "",
     ServiceDate: formatDate(row.service_date),
     EngineHours: row.engine_hours ?? "",
@@ -261,7 +260,6 @@ export default function Maintenance() {
   }
 
   function validateForm() {
-    if (!form.MaintenanceID.trim()) return "Maintenance ID is required";
     if (!form.EngineID.trim()) return "Engine is required";
     if (!form.ServiceDate) return "Service date is required";
 
@@ -323,8 +321,18 @@ export default function Maintenance() {
         );
         setSuccess("Maintenance record updated successfully");
       } else {
-        await api.post("/maintenance", payload);
-        setSuccess("Maintenance record created successfully");
+        const response = await api.post(
+          "/maintenance",
+          payload
+        );
+        const generatedId =
+          response.data?.maintenance?.maintenance_id;
+
+        setSuccess(
+          generatedId
+            ? `Maintenance ${generatedId} created successfully`
+            : "Maintenance record created successfully"
+        );
       }
 
       setFormOpen(false);
@@ -387,14 +395,7 @@ export default function Maintenance() {
   }
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        overflowX: "hidden",
-      }}
-    >
+    <Box>
       <Stack sx={{
         flexDirection: { xs: "column", sm: "row" },
         justifyContent: "space-between",
@@ -415,7 +416,6 @@ export default function Maintenance() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={openCreateDialog}
-          sx={{ width: { xs: "100%", sm: "auto" } }}
         >
           Add maintenance
         </Button>
@@ -433,16 +433,7 @@ export default function Maintenance() {
         </Alert>
       )}
 
-      <Paper
-        sx={{
-          p: { xs: 1.5, sm: 2 },
-          mb: 2,
-          width: "100%",
-          maxWidth: "100%",
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Stack sx={{
           flexDirection: { xs: "column", sm: "row" },
           alignItems: { xs: "stretch", sm: "center" },
@@ -454,7 +445,6 @@ export default function Maintenance() {
             placeholder="Search service, engine, vessel, customer, technician..."
             fullWidth
             size="small"
-            sx={{ minWidth: 0 }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -484,37 +474,14 @@ export default function Maintenance() {
         </Typography>
       </Paper>
 
-      <Paper
-        sx={{
-          width: "100%",
-          maxWidth: "100%",
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
-        <TableContainer
-          sx={{
-            width: "100%",
-            maxWidth: "100%",
-            overflowX: "hidden",
-          }}
-        >
+      <Paper>
+        <TableContainer>
           {loading ? (
             <Box sx={{ minHeight: 260, display: "grid", placeItems: "center" }}>
               <CircularProgress />
             </Box>
           ) : (
-            <Table
-              size="small"
-              sx={{
-                width: "100%",
-                tableLayout: { xs: "fixed", sm: "auto" },
-                "& .MuiTableCell-root": {
-                  px: { xs: 1, sm: 2 },
-                  py: { xs: 1.25, sm: 1 },
-                },
-              }}
-            >
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -523,20 +490,11 @@ export default function Maintenance() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "maintenance_id" ||
-                          column.id === "service_date"
+                          column.id === "status"
                             ? { xs: "none", sm: "table-cell" }
                             : column.id === "engine_hours"
                               ? { xs: "none", md: "table-cell" }
-                              : column.id === "total_cost"
-                                ? { xs: "none", sm: "table-cell" }
-                                : "table-cell",
-                        ...(column.id === "engine_name" && {
-                          width: { xs: "auto", sm: "auto" },
-                        }),
-                        ...(column.id === "status" && {
-                          width: { xs: 92, sm: "auto" },
-                        }),
+                              : "table-cell",
                       }}
                     >
                       <TableSortLabel
@@ -558,81 +516,24 @@ export default function Maintenance() {
                   <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                     Technician
                   </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{
-                      width: { xs: 48, sm: "auto" },
-                      minWidth: { xs: 48, sm: "auto" },
-                      px: { xs: 0.5, sm: 2 },
-                    }}
-                  >
-                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                      Actions
-                    </Box>
-                  </TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
 
               <TableBody>
                 {visibleRecords.map((record) => (
                   <TableRow key={record.maintenance_id} hover>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                      {record.maintenance_id}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                      {formatDate(record.service_date) || "—"}
-                    </TableCell>
-                    <TableCell sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                    <TableCell>{record.maintenance_id}</TableCell>
+                    <TableCell>{formatDate(record.service_date) || "—"}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {record.engine_name}
                       </Typography>
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          display: "block",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                          {formatDate(record.service_date) || "Date not recorded"}
-                          {record.vessel_name ? ` • ${record.vessel_name}` : ""}
-                        </Box>
-                        <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                          {record.serial_value}
-                        </Box>
-                      </Typography>
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          display: { xs: "block", sm: "none" },
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {record.service_type || record.customer_name || "—"}
+                      <Typography variant="caption" color="text.secondary">
+                        {record.serial_value}
                       </Typography>
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        width: { xs: 92, sm: "auto" },
-                        px: { xs: 0.5, sm: 2 },
-                      }}
-                    >
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                       <Chip
                         size="small"
                         label={record.status || "Open"}
@@ -645,10 +546,7 @@ export default function Maintenance() {
                     >
                       {record.engine_hours ?? "—"}
                     </TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{ display: { xs: "none", sm: "table-cell" } }}
-                    >
+                    <TableCell align="right">
                       {currency(record.total_cost)}
                     </TableCell>
                     <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
@@ -665,14 +563,7 @@ export default function Maintenance() {
                     <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                       {record.technician || "—"}
                     </TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{
-                        width: { xs: 48, sm: "auto" },
-                        minWidth: { xs: 48, sm: "auto" },
-                        px: { xs: 0.25, sm: 2 },
-                      }}
-                    >
+                    <TableCell align="right">
                       <Tooltip title="Maintenance actions">
                         <IconButton
                           size="small"
@@ -709,30 +600,6 @@ export default function Maintenance() {
               setPage(0);
             }}
             rowsPerPageOptions={[5, 10, 25, 50]}
-            labelRowsPerPage="Rows per page"
-            sx={{
-              width: "100%",
-              maxWidth: "100%",
-              overflow: "hidden",
-              "& .MuiTablePagination-toolbar": {
-                minHeight: 52,
-                px: { xs: 0.5, sm: 2 },
-                justifyContent: { xs: "center", sm: "flex-end" },
-              },
-              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-input": {
-                display: { xs: "none", sm: "inline-flex" },
-              },
-              "& .MuiTablePagination-displayedRows": {
-                m: 0,
-                fontSize: { xs: "0.75rem", sm: "0.875rem" },
-              },
-              "& .MuiTablePagination-actions": {
-                ml: { xs: 0.5, sm: 2 },
-              },
-              "& .MuiIconButton-root": {
-                p: { xs: 0.75, sm: 1 },
-              },
-            }}
           />
         )}
       </Paper>
@@ -765,14 +632,6 @@ export default function Maintenance() {
               gap: 2,
               pt: 1,
             }}>
-              <TextField
-                label="Maintenance ID"
-                name="MaintenanceID"
-                value={form.MaintenanceID}
-                onChange={handleChange}
-                required
-                disabled={Boolean(editingId)}
-              />
 
               <TextField
                 select

@@ -38,7 +38,6 @@ import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 const emptyForm = {
-  CustomerID: "",
   Company: "",
   Industry: "",
   ContactPerson: "",
@@ -65,7 +64,6 @@ const sortableColumns = [
 
 function mapRowToForm(row) {
   return {
-    CustomerID: row.customer_id || "",
     Company: row.company || "",
     Industry: row.industry || "",
     ContactPerson: row.contact_person || "",
@@ -238,11 +236,6 @@ export default function Customers() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!form.CustomerID.trim()) {
-      setError("Customer ID is required");
-      return;
-    }
-
     if (!form.Company.trim()) {
       setError("Company is required");
       return;
@@ -272,8 +265,15 @@ export default function Customers() {
         );
         setSuccess("Customer updated successfully");
       } else {
-        await api.post("/customers", payload);
-        setSuccess("Customer created successfully");
+        const response = await api.post("/customers", payload);
+        const generatedId =
+          response.data?.customer?.customer_id;
+
+        setSuccess(
+          generatedId
+            ? `Customer ${generatedId} created successfully`
+            : "Customer created successfully"
+        );
       }
 
       closeFormDialog();
@@ -345,14 +345,7 @@ export default function Customers() {
   }
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        overflowX: "hidden",
-      }}
-    >
+    <Box>
       <Stack
         sx={{
           flexDirection: {
@@ -411,7 +404,7 @@ export default function Customers() {
         </Alert>
       )}
 
-      <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, minWidth: 0, overflow: "hidden" }}>
+      <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
           sx={{
             flexDirection: {
@@ -470,8 +463,8 @@ export default function Customers() {
         </Typography>
       </Paper>
 
-      <Paper sx={{ width: "100%", maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
-        <TableContainer sx={{ width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
+      <Paper>
+        <TableContainer>
           {loading ? (
             <Box
               sx={{
@@ -483,19 +476,7 @@ export default function Customers() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table
-              size="small"
-              sx={{
-                width: "100%",
-                tableLayout: "fixed",
-                "& .MuiTableCell-root": {
-                  px: { xs: 0.75, sm: 2 },
-                  py: { xs: 1, sm: 1.25 },
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                },
-              }}
-            >
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -504,21 +485,17 @@ export default function Customers() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "company"
-                            ? "table-cell"
+                          column.id === "contact_person"
+                            ? {
+                                xs: "none",
+                                md: "table-cell",
+                              }
                             : column.id === "province"
-                              ? { xs: "none", sm: "table-cell" }
-                              : column.id === "contact_person"
-                                ? { xs: "none", md: "table-cell" }
-                                : column.id === "customer_id" ||
-                                    column.id === "fleet_size"
-                                  ? { xs: "none", sm: "table-cell" }
-                                  : "table-cell",
-                        width:
-                          column.id === "company"
-                            ? { xs: "auto", sm: "30%" }
-                            : undefined,
-                        whiteSpace: "nowrap",
+                              ? {
+                                  xs: "none",
+                                  sm: "table-cell",
+                                }
+                              : "table-cell",
                       }}
                     >
                       <TableSortLabel
@@ -559,17 +536,8 @@ export default function Customers() {
                     Email
                   </TableCell>
 
-                  <TableCell
-                    align="right"
-                    sx={{
-                      width: { xs: 48, sm: 88 },
-                      minWidth: { xs: 48, sm: 88 },
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                      Actions
-                    </Box>
+                  <TableCell align="right">
+                    Actions
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -580,21 +548,14 @@ export default function Customers() {
                     key={customer.customer_id}
                     hover
                   >
-                    <TableCell
-                      sx={{ display: { xs: "none", sm: "table-cell" } }}
-                    >
+                    <TableCell>
                       {customer.customer_id}
                     </TableCell>
 
-                    <TableCell sx={{ minWidth: 0 }}>
+                    <TableCell>
                       <Typography
                         variant="body2"
-                        sx={{
-                          fontWeight: 600,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
+                        sx={{ fontWeight: 600 }}
                       >
                         {customer.company}
                       </Typography>
@@ -602,12 +563,6 @@ export default function Customers() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{
-                          display: "block",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
                       >
                         {customer.industry || "—"}
                       </Typography>
@@ -635,10 +590,7 @@ export default function Customers() {
                       {customer.province || "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{ display: { xs: "none", sm: "table-cell" } }}
-                    >
+                    <TableCell align="right">
                       {customer.fleet_size ?? "—"}
                     </TableCell>
 
@@ -664,14 +616,7 @@ export default function Customers() {
                       {customer.email || "—"}
                     </TableCell>
 
-                    <TableCell
-                      align="right"
-                      sx={{
-                        width: { xs: 48, sm: 88 },
-                        minWidth: { xs: 48, sm: 88 },
-                        px: { xs: 0.25, sm: 1 },
-                      }}
-                    >
+                    <TableCell align="right">
                       <Tooltip title="Customer actions">
                         <IconButton
                           size="small"
@@ -705,23 +650,6 @@ export default function Customers() {
         {!loading && (
           <TablePagination
             component="div"
-            sx={{
-              width: "100%",
-              overflow: "hidden",
-              "& .MuiTablePagination-toolbar": {
-                px: { xs: 0.5, sm: 2 },
-                minHeight: 52,
-              },
-              "& .MuiTablePagination-selectLabel": {
-                display: { xs: "none", sm: "block" },
-              },
-              "& .MuiTablePagination-displayedRows": {
-                mx: { xs: 0.5, sm: 2 },
-              },
-              "& .MuiTablePagination-actions": {
-                ml: { xs: 0.25, sm: 2 },
-              },
-            }}
             count={sortedCustomers.length}
             page={page}
             onPageChange={(_event, nextPage) =>
@@ -793,7 +721,6 @@ export default function Customers() {
               }}
             >
               {[
-                ["CustomerID", "Customer ID", "text"],
                 ["Company", "Company", "text"],
                 ["Industry", "Industry", "text"],
                 [
@@ -830,14 +757,7 @@ export default function Customers() {
                   type={type}
                   value={form[name]}
                   onChange={handleChange}
-                  required={
-                    name === "CustomerID" ||
-                    name === "Company"
-                  }
-                  disabled={
-                    name === "CustomerID" &&
-                    Boolean(editingId)
-                  }
+                  required={name === "Company"}
                 />
               ))}
 
