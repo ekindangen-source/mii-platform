@@ -1,8 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db/database");
+const {
+  requireAuth,
+  requireRole,
+} = require("../middleware/auth");
 
-router.get("/", async (_req, res) => {
+router.get(
+  "/",
+  requireAuth,
+  async (_req, res) => {
   try {
     const result = await pool.query(
       `SELECT
@@ -31,7 +38,10 @@ router.get("/", async (_req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get(
+  "/:id",
+  requireAuth,
+  async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT *
@@ -56,7 +66,11 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post(
+  "/",
+  requireAuth,
+  requireRole("admin", "manager", "technician"),
+  async (req, res) => {
   try {
     const r = req.body;
 
@@ -113,7 +127,11 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put(
+  "/:id",
+  requireAuth,
+  requireRole("admin", "manager", "technician"),
+  async (req, res) => {
   try {
     const r = req.body;
 
@@ -177,7 +195,11 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole("admin", "manager"),
+  async (req, res) => {
   try {
     const result = await pool.query(
       `DELETE FROM maintenance

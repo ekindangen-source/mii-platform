@@ -1,8 +1,16 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db/database");
+const {
+  requireAuth,
+  requireRole,
+} = require("../middleware/auth");
 
-router.post("/", async (req, res) => {
+router.post(
+  "/",
+  requireAuth,
+  requireRole("admin", "manager", "sales"),
+  async (req, res) => {
   try {
     const r = req.body;
 
@@ -52,7 +60,10 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/", async (_req, res) => {
+router.get(
+  "/",
+  requireAuth,
+  async (_req, res) => {
   try {
     const result = await pool.query(
       `SELECT v.*, c.company
@@ -72,7 +83,11 @@ router.get("/", async (_req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put(
+  "/:id",
+  requireAuth,
+  requireRole("admin", "manager", "sales"),
+  async (req, res) => {
   try {
     const r = req.body;
 
@@ -130,7 +145,11 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole("admin", "manager"),
+  async (req, res) => {
   try {
     const result = await pool.query(
       `DELETE FROM vessels

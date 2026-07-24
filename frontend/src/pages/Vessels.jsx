@@ -36,6 +36,11 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
+import {
+  canDeleteModule,
+  canWriteModule,
+} from "../utils/permissions";
 
 const emptyForm = {
   CustomerID: "",
@@ -110,6 +115,16 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Vessels() {
+  const { user } = useAuth();
+  const canWrite = canWriteModule(
+    user?.role,
+    "vessels"
+  );
+  const canDelete = canDeleteModule(
+    user?.role,
+    "vessels"
+  );
+
   const [vessels, setVessels] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
@@ -436,13 +451,15 @@ export default function Vessels() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreate}
-        >
-          Add vessel
-        </Button>
+        {canWrite && (
+          <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={openCreate}
+                  >
+                    Add vessel
+                  </Button>
+        )}
       </Stack>
 
       {error && (
@@ -703,16 +720,18 @@ export default function Vessels() {
                     </TableCell>
 
                     <TableCell align="right">
-                      <Tooltip title="Vessel actions">
-                        <IconButton
-                          size="small"
-                          onClick={(event) =>
-                            openActionMenu(event, vessel)
-                          }
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {(canWrite || canDelete) && (
+                        <Tooltip title="Vessel actions">
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(event) =>
+                                                    openActionMenu(event, vessel)
+                                                  }
+                                                >
+                                                  <MoreVertIcon />
+                                                </IconButton>
+                                              </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -758,24 +777,28 @@ export default function Vessels() {
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
       >
-        <MenuItem onClick={handleEditFromMenu}>
-          <EditIcon
-            fontSize="small"
-            sx={{ mr: 1.25 }}
-          />
-          Edit
-        </MenuItem>
+        {canWrite && (
+          <MenuItem onClick={handleEditFromMenu}>
+            <EditIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Edit
+          </MenuItem>
+        )}
 
-        <MenuItem
-          onClick={handleDeleteFromMenu}
-          sx={{ color: "error.main" }}
-        >
-          <DeleteIcon
-            fontSize="small"
-            sx={{ mr: 1.25 }}
-          />
-          Delete
-        </MenuItem>
+        {canDelete && (
+          <MenuItem
+            onClick={handleDeleteFromMenu}
+            sx={{ color: "error.main" }}
+          >
+            <DeleteIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog

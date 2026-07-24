@@ -17,6 +17,11 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
+import {
+  canDeleteModule,
+  canWriteModule,
+} from "../utils/permissions";
 
 const emptyForm = {
   EngineID: "", ServiceDate: "",
@@ -106,6 +111,16 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Maintenance() {
+  const { user } = useAuth();
+  const canWrite = canWriteModule(
+    user?.role,
+    "maintenance"
+  );
+  const canDelete = canDeleteModule(
+    user?.role,
+    "maintenance"
+  );
+
   const [records, setRecords] = useState([]);
   const [engines, setEngines] = useState([]);
   const [search, setSearch] = useState("");
@@ -412,13 +427,15 @@ export default function Maintenance() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreateDialog}
-        >
-          Add maintenance
-        </Button>
+        {canWrite && (
+          <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={openCreateDialog}
+                  >
+                    Add maintenance
+                  </Button>
+        )}
       </Stack>
 
       {error && (
@@ -564,14 +581,16 @@ export default function Maintenance() {
                       {record.technician || "—"}
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Maintenance actions">
-                        <IconButton
-                          size="small"
-                          onClick={(event) => openActionMenu(event, record)}
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {(canWrite || canDelete) && (
+                        <Tooltip title="Maintenance actions">
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(event) => openActionMenu(event, record)}
+                                                >
+                                                  <MoreVertIcon />
+                                                </IconButton>
+                                              </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -609,14 +628,28 @@ export default function Maintenance() {
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
       >
-        <MenuItem onClick={handleEditFromMenu}>
-          <EditIcon fontSize="small" sx={{ mr: 1.25 }} />
-          Edit
-        </MenuItem>
-        <MenuItem onClick={handleDeleteFromMenu} sx={{ color: "error.main" }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1.25 }} />
-          Delete
-        </MenuItem>
+        {canWrite && (
+          <MenuItem onClick={handleEditFromMenu}>
+            <EditIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Edit
+          </MenuItem>
+        )}
+
+        {canDelete && (
+          <MenuItem
+            onClick={handleDeleteFromMenu}
+            sx={{ color: "error.main" }}
+          >
+            <DeleteIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog open={formOpen} onClose={closeFormDialog} fullWidth maxWidth="md">

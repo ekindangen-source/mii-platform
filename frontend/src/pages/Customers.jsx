@@ -36,6 +36,11 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
+import {
+  canDeleteModule,
+  canWriteModule,
+} from "../utils/permissions";
 
 const emptyForm = {
   Company: "",
@@ -97,6 +102,16 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Customers() {
+  const { user } = useAuth();
+  const canWrite = canWriteModule(
+    user?.role,
+    "customers"
+  );
+  const canDelete = canDeleteModule(
+    user?.role,
+    "customers"
+  );
+
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
   const [orderBy, setOrderBy] = useState("company");
@@ -375,13 +390,15 @@ export default function Customers() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreateDialog}
-        >
-          Add customer
-        </Button>
+        {canWrite && (
+          <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={openCreateDialog}
+                  >
+                    Add customer
+                  </Button>
+        )}
       </Stack>
 
       {error && (
@@ -617,16 +634,18 @@ export default function Customers() {
                     </TableCell>
 
                     <TableCell align="right">
-                      <Tooltip title="Customer actions">
-                        <IconButton
-                          size="small"
-                          onClick={(event) =>
-                            openActionMenu(event, customer)
-                          }
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {(canWrite || canDelete) && (
+                        <Tooltip title="Customer actions">
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(event) =>
+                                                    openActionMenu(event, customer)
+                                                  }
+                                                >
+                                                  <MoreVertIcon />
+                                                </IconButton>
+                                              </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -672,24 +691,28 @@ export default function Customers() {
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
       >
-        <MenuItem onClick={handleEditFromMenu}>
-          <EditIcon
-            fontSize="small"
-            sx={{ mr: 1.25 }}
-          />
-          Edit
-        </MenuItem>
+        {canWrite && (
+          <MenuItem onClick={handleEditFromMenu}>
+            <EditIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Edit
+          </MenuItem>
+        )}
 
-        <MenuItem
-          onClick={handleDeleteFromMenu}
-          sx={{ color: "error.main" }}
-        >
-          <DeleteIcon
-            fontSize="small"
-            sx={{ mr: 1.25 }}
-          />
-          Delete
-        </MenuItem>
+        {canDelete && (
+          <MenuItem
+            onClick={handleDeleteFromMenu}
+            sx={{ color: "error.main" }}
+          >
+            <DeleteIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog

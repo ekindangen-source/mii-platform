@@ -16,6 +16,11 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
+import {
+  canDeleteModule,
+  canWriteModule,
+} from "../utils/permissions";
 
 const emptyForm = {
   VesselID: "", Date: "", Captain: "",
@@ -69,6 +74,16 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Trips() {
+  const { user } = useAuth();
+  const canWrite = canWriteModule(
+    user?.role,
+    "trips"
+  );
+  const canDelete = canDeleteModule(
+    user?.role,
+    "trips"
+  );
+
   const [trips, setTrips] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [search, setSearch] = useState("");
@@ -345,13 +360,15 @@ export default function Trips() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreateDialog}
-        >
-          Add trip
-        </Button>
+        {canWrite && (
+          <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={openCreateDialog}
+                  >
+                    Add trip
+                  </Button>
+        )}
       </Stack>
 
       {error && (
@@ -491,14 +508,16 @@ export default function Trips() {
                       {trip.sea_state || "—"}
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Trip actions">
-                        <IconButton
-                          size="small"
-                          onClick={(event) => openActionMenu(event, trip)}
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {(canWrite || canDelete) && (
+                        <Tooltip title="Trip actions">
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(event) => openActionMenu(event, trip)}
+                                                >
+                                                  <MoreVertIcon />
+                                                </IconButton>
+                                              </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -536,14 +555,28 @@ export default function Trips() {
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
       >
-        <MenuItem onClick={handleEditFromMenu}>
-          <EditIcon fontSize="small" sx={{ mr: 1.25 }} />
-          Edit
-        </MenuItem>
-        <MenuItem onClick={handleDeleteFromMenu} sx={{ color: "error.main" }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1.25 }} />
-          Delete
-        </MenuItem>
+        {canWrite && (
+          <MenuItem onClick={handleEditFromMenu}>
+            <EditIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Edit
+          </MenuItem>
+        )}
+
+        {canDelete && (
+          <MenuItem
+            onClick={handleDeleteFromMenu}
+            sx={{ color: "error.main" }}
+          >
+            <DeleteIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog open={formOpen} onClose={closeFormDialog} fullWidth maxWidth="md">
