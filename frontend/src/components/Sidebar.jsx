@@ -77,8 +77,9 @@ const navigationGroups = [
     items: [
       {
         label: "Users",
+        path: "/users",
         icon: <ManageAccountsIcon />,
-        disabled: true,
+        adminOnly: true,
       },
       {
         label: "Settings",
@@ -244,7 +245,13 @@ export default function Sidebar({ onNavigate }) {
             )}
 
             <List disablePadding>
-              {group.items.map((item) => {
+              {group.items
+                .filter(
+                  (item) =>
+                    !item.adminOnly ||
+                    user?.role === "admin"
+                )
+                .map((item) => {
                 const commonSx = {
                   minHeight: 44,
                   px: 1.5,

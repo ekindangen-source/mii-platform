@@ -5,7 +5,10 @@ import {
   Routes,
 } from "react-router-dom";
 
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import {
+  AuthProvider,
+  useAuth,
+} from "./context/AuthContext";
 
 import DashboardLayout from "./layouts/DashboardLayout";
 import Login from "./pages/Login";
@@ -15,6 +18,7 @@ import Vessels from "./pages/Vessels";
 import Engines from "./pages/Engines";
 import Trips from "./pages/Trips";
 import Maintenance from "./pages/Maintenance";
+import Users from "./pages/Users";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -23,9 +27,21 @@ function PrivateRoute({ children }) {
     return <div>Loading...</div>;
   }
 
-  return isAuthenticated
-    ? children
-    : <Navigate to="/login" replace />;
+  return isAuthenticated ? (
+    children
+  ) : (
+    <Navigate to="/login" replace />
+  );
+}
+
+function AdminRoute({ children }) {
+  const { user } = useAuth();
+
+  return user?.role === "admin" ? (
+    children
+  ) : (
+    <Navigate to="/" replace />
+  );
 }
 
 function AppRoutes() {
@@ -41,14 +57,40 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<Dashboard />} />
-        <Route path="/customers" element={<Customers />} />
-        <Route path="/vessels" element={<Vessels />} />
-        <Route path="/engines" element={<Engines />} />
-        <Route path="/trips" element={<Trips />} />
-        <Route path="/maintenance" element={<Maintenance />} />
+        <Route
+          path="/customers"
+          element={<Customers />}
+        />
+        <Route
+          path="/vessels"
+          element={<Vessels />}
+        />
+        <Route
+          path="/engines"
+          element={<Engines />}
+        />
+        <Route
+          path="/trips"
+          element={<Trips />}
+        />
+        <Route
+          path="/maintenance"
+          element={<Maintenance />}
+        />
+        <Route
+          path="/users"
+          element={
+            <AdminRoute>
+              <Users />
+            </AdminRoute>
+          }
+        />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
+      />
     </Routes>
   );
 }
