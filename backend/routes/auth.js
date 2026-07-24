@@ -12,7 +12,8 @@ const {
 const allowedRoles = [
   "admin",
   "manager",
-  "user",
+  "sales",
+  "technician",
   "viewer",
 ];
 
