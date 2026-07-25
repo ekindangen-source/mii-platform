@@ -1,7 +1,5 @@
 import {
-  Avatar,
   Box,
-  Button,
   Divider,
   List,
   ListItemButton,
@@ -17,12 +15,11 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
 import EngineeringIcon from "@mui/icons-material/Engineering";
 import GroupsIcon from "@mui/icons-material/Groups";
-import LogoutIcon from "@mui/icons-material/Logout";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import RouteIcon from "@mui/icons-material/Route";
 import SettingsIcon from "@mui/icons-material/Settings";
 
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -90,43 +87,8 @@ const navigationGroups = [
   },
 ];
 
-function initialsFor(user) {
-  const source =
-    user?.fullName ||
-    user?.email ||
-    "MII User";
-
-  const parts = source
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (!parts.length) {
-    return "MU";
-  }
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
-function roleLabel(role) {
-  if (!role) {
-    return "User";
-  }
-
-  return role
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (character) =>
-      character.toUpperCase()
-    );
-}
-
 export default function Sidebar({ onNavigate }) {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   function handleNavigate() {
     if (onNavigate) {
@@ -134,14 +96,6 @@ export default function Sidebar({ onNavigate }) {
     }
   }
 
-  function handleLogout() {
-    logout();
-    navigate("/login", { replace: true });
-
-    if (onNavigate) {
-      onNavigate();
-    }
-  }
 
   return (
     <Box
@@ -358,80 +312,6 @@ export default function Sidebar({ onNavigate }) {
         ))}
       </Box>
 
-      <Box
-        sx={{
-          p: 1.5,
-          borderTop:
-            "1px solid rgba(255,255,255,0.08)",
-          bgcolor: "rgba(2,6,23,0.34)",
-        }}
-      >
-        <Stack
-          sx={{
-            flexDirection: "row",
-            gap: 1.25,
-            alignItems: "center",
-            px: 1,
-            py: 1,
-            mb: 1,
-          }}
-        >
-          <Avatar
-            sx={{
-              width: 38,
-              height: 38,
-              bgcolor: "primary.main",
-              fontSize: 14,
-              fontWeight: 800,
-            }}
-          >
-            {initialsFor(user)}
-          </Avatar>
-
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{ fontWeight: 700 }}
-            >
-              {user?.fullName ||
-                user?.email ||
-                "MII User"}
-            </Typography>
-
-            <Typography
-              variant="caption"
-              noWrap
-              sx={{
-                display: "block",
-                color: "rgba(255,255,255,0.48)",
-              }}
-            >
-              {roleLabel(user?.role)}
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<LogoutIcon />}
-          onClick={handleLogout}
-          sx={{
-            justifyContent: "flex-start",
-            color: "rgba(255,255,255,0.76)",
-            borderColor: "rgba(255,255,255,0.14)",
-            textTransform: "none",
-            "&:hover": {
-              color: "common.white",
-              borderColor: "rgba(255,255,255,0.30)",
-              bgcolor: "rgba(255,255,255,0.06)",
-            },
-          }}
-        >
-          Logout
-        </Button>
-      </Box>
     </Box>
   );
 }
