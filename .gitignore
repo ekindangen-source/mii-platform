@@ -20,3 +20,25 @@ build/
 Thumbs.db
 
 frontend/mii-frontend.tar.gz
+
+$entries = @(
+  "backend/.env",
+  "frontend/mii-frontend.tar.gz",
+  "backend/uploads/vessels/*",
+  "!backend/uploads/vessels/.gitignore"
+)
+
+foreach ($entry in $entries) {
+  if (
+    -not (
+      Select-String `
+        -Path .gitignore `
+        -SimpleMatch `
+        -Pattern $entry `
+        -Quiet `
+        -ErrorAction SilentlyContinue
+    )
+  ) {
+    Add-Content .gitignore $entry
+  }
+}
