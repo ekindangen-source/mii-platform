@@ -28,13 +28,16 @@ import {
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
-import api from "../services/api";
+import api, {
+  apiAssetUrl,
+} from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
@@ -82,6 +85,37 @@ const sortableColumns = [
   { id: "year_built", label: "Year", numeric: true },
   { id: "length_m", label: "Length (m)", numeric: true },
 ];
+
+const ALLOWED_PHOTO_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+const MAX_PHOTO_BYTES =
+  5 * 1024 * 1024;
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () =>
+      resolve(String(reader.result || ""));
+
+    reader.onerror = () =>
+      reject(
+        new Error("Unable to read photo")
+      );
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function vesselPhotoUrl(photoPath) {
+  return photoPath
+    ? apiAssetUrl(photoPath)
+    : "";
+}
 
 function mapRow(row) {
   return {
@@ -151,6 +185,10 @@ export default function Vessels() {
   const [actionVessel, setActionVessel] = useState(null);
 
   const [selectedVessel, setSelectedVessel] = useState(null);
+
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [removePhoto, setRemovePhoto] = useState(false);
 
   async function loadData() {
     try {
@@ -273,12 +311,20 @@ export default function Vessels() {
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
+    setPhotoFile(null);
+    setPhotoPreview("");
+    setRemovePhoto(false);
     setFormOpen(true);
   }
 
   function openEdit(vessel) {
     setEditingId(vessel.vessel_id);
     setForm(mapRow(vessel));
+    setPhotoFile(null);
+    setPhotoPreview(
+      vesselPhotoUrl(vessel.photo_path)
+    );
+    setRemovePhoto(false);
     setFormOpen(true);
   }
 
@@ -290,6 +336,89 @@ export default function Vessels() {
     setFormOpen(false);
     setEditingId(null);
     setForm(emptyForm);
+    setPhotoFile(null);
+    setPhotoPreview("");
+    setRemovePhoto(false);
+  }
+
+  function handlePhotoChange(event) {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (
+      !ALLOWED_PHOTO_TYPES.includes(
+        file.type
+      )
+    ) {
+      setError(
+        "Only JPG, PNG, and WebP photos are allowed"
+      );
+      return;
+    }
+
+    if (file.size > MAX_PHOTO_BYTES) {
+      setError(
+        "Vessel photo must not exceed 5 MB"
+      );
+      return;
+    }
+
+    setError("");
+    setPhotoFile(file);
+    setRemovePhoto(false);
+
+    const reader = new FileReader();
+
+    reader.onload = () =>
+      setPhotoPreview(
+        String(reader.result || "")
+      );
+
+    reader.readAsDataURL(file);
+  }
+
+  function clearPhoto() {
+    setPhotoFile(null);
+    setPhotoPreview("");
+    setRemovePhoto(Boolean(editingId));
+  }
+
+  async function saveVesselPhoto(
+    vesselId
+  ) {
+    if (photoFile) {
+      const dataUrl =
+        await fileToDataUrl(photoFile);
+
+      const base64 =
+        dataUrl.split(",")[1] || "";
+
+      await api.put(
+        `/vessels/${encodeURIComponent(
+          vesselId
+        )}/photo`,
+        {
+          FileName: photoFile.name,
+          MimeType: photoFile.type,
+          DataBase64: base64,
+        }
+      );
+
+      return;
+    }
+
+    if (removePhoto && editingId) {
+      await api.delete(
+        `/vessels/${encodeURIComponent(
+          vesselId
+        )}/photo`
+      );
+    }
   }
 
   function change(event) {
@@ -338,24 +467,53 @@ export default function Vessels() {
       setError("");
       setSuccess("");
 
+      let savedVesselId = editingId;
+      let successMessage =
+        "Vessel updated successfully";
+
       if (editingId) {
         await api.put(
           `/vessels/${encodeURIComponent(editingId)}`,
           payload
         );
-        setSuccess("Vessel updated successfully");
       } else {
-        const response = await api.post("/vessels", payload);
-        const generatedId =
+        const response = await api.post(
+          "/vessels",
+          payload
+        );
+
+        savedVesselId =
           response.data?.vessel?.vessel_id;
 
-        setSuccess(
-          generatedId
-            ? `Vessel ${generatedId} created successfully`
-            : "Vessel created successfully"
+        successMessage = savedVesselId
+          ? `Vessel ${savedVesselId} created successfully`
+          : "Vessel created successfully";
+      }
+
+      if (!savedVesselId) {
+        throw new Error(
+          "Vessel was saved but no vessel ID was returned"
         );
       }
 
+      try {
+        await saveVesselPhoto(
+          savedVesselId
+        );
+      } catch (photoError) {
+        await loadData();
+
+        setEditingId(savedVesselId);
+        setError(
+          `Vessel saved, but the photo could not be updated: ${
+            photoError.response?.data?.message ||
+            photoError.message
+          }`
+        );
+        return;
+      }
+
+      setSuccess(successMessage);
       closeForm();
       await loadData();
     } catch (err) {
@@ -688,6 +846,14 @@ export default function Vessels() {
             <Table size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell
+                    sx={{
+                      width: 76,
+                    }}
+                  >
+                    Photo
+                  </TableCell>
+
                   {sortableColumns.map((column) => (
                     <TableCell
                       key={column.id}
@@ -782,6 +948,45 @@ export default function Vessels() {
                     }}
                     sx={{ cursor: "pointer" }}
                   >
+                    <TableCell>
+                      {vessel.photo_path ? (
+                        <Box
+                          component="img"
+                          src={vesselPhotoUrl(
+                            vessel.photo_path
+                          )}
+                          alt={
+                            vessel.boat_name ||
+                            vessel.vessel_id
+                          }
+                          sx={{
+                            display: "block",
+                            width: 56,
+                            height: 42,
+                            objectFit: "cover",
+                            borderRadius: 1.5,
+                            bgcolor: "grey.100",
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            display: "grid",
+                            placeItems: "center",
+                            width: 56,
+                            height: 42,
+                            borderRadius: 1.5,
+                            bgcolor: "grey.100",
+                            color: "text.disabled",
+                          }}
+                        >
+                          <PhotoCameraIcon
+                            fontSize="small"
+                          />
+                        </Box>
+                      )}
+                    </TableCell>
+
                     <TableCell>
                       {vessel.vessel_id}
                     </TableCell>
@@ -884,7 +1089,7 @@ export default function Vessels() {
                 {!visibleVessels.length && (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       align="center"
                       sx={{ py: 5 }}
                     >
@@ -954,6 +1159,13 @@ export default function Vessels() {
           "Vessel details"
         }
         subtitle={selectedVessel?.vessel_id}
+        imageSrc={vesselPhotoUrl(
+          selectedVessel?.photo_path
+        )}
+        imageAlt={
+          selectedVessel?.boat_name ||
+          selectedVessel?.vessel_id
+        }
         sections={vesselDetailSections}
         canEdit={canWrite}
         canDelete={canDelete}
@@ -987,6 +1199,122 @@ export default function Vessels() {
                 pt: 1,
               }}
             >
+              <Box
+                sx={{
+                  gridColumn: {
+                    sm: "1 / -1",
+                  },
+                  display: "flex",
+                  flexDirection: {
+                    xs: "column",
+                    sm: "row",
+                  },
+                  alignItems: {
+                    xs: "stretch",
+                    sm: "center",
+                  },
+                  gap: 2,
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                {photoPreview ? (
+                  <Box
+                    component="img"
+                    src={photoPreview}
+                    alt="Vessel preview"
+                    sx={{
+                      width: {
+                        xs: "100%",
+                        sm: 180,
+                      },
+                      height: 120,
+                      objectFit: "cover",
+                      borderRadius: 1.5,
+                      bgcolor: "grey.100",
+                    }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      display: "grid",
+                      placeItems: "center",
+                      width: {
+                        xs: "100%",
+                        sm: 180,
+                      },
+                      height: 120,
+                      borderRadius: 1.5,
+                      bgcolor: "grey.100",
+                      color: "text.disabled",
+                    }}
+                  >
+                    <PhotoCameraIcon
+                      sx={{ fontSize: 42 }}
+                    />
+                  </Box>
+                )}
+
+                <Stack sx={{ gap: 1 }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 700 }}
+                  >
+                    Vessel photo
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    One JPG, PNG, or WebP photo,
+                    maximum 5 MB.
+                  </Typography>
+
+                  <Stack
+                    sx={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: 1,
+                    }}
+                  >
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={
+                        <PhotoCameraIcon />
+                      }
+                    >
+                      {photoPreview
+                        ? "Replace photo"
+                        : "Choose photo"}
+
+                      <input
+                        hidden
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={
+                          handlePhotoChange
+                        }
+                      />
+                    </Button>
+
+                    {photoPreview && (
+                      <Button
+                        color="error"
+                        startIcon={
+                          <DeleteIcon />
+                        }
+                        onClick={clearPhoto}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </Stack>
+                </Stack>
+              </Box>
 
               <TextField
                 select

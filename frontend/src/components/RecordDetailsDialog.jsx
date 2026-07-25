@@ -103,6 +103,8 @@ export default function RecordDetailsDialog({
   onClose,
   title,
   subtitle,
+  imageSrc,
+  imageAlt,
   sections = [],
   canEdit = false,
   canDelete = false,
@@ -161,6 +163,23 @@ export default function RecordDetailsDialog({
 
       <DialogContent dividers>
         <Stack sx={{ gap: 3 }}>
+          {imageSrc && (
+            <Box
+              component="img"
+              src={imageSrc}
+              alt={imageAlt || title || "Record photo"}
+              sx={{
+                width: "100%",
+                maxHeight: {
+                  xs: 260,
+                  sm: 420,
+                },
+                objectFit: "contain",
+                borderRadius: 2,
+                bgcolor: "grey.100",
+              }}
+            />
+          )}
           {sections.map((section, index) => (
             <Box
               key={

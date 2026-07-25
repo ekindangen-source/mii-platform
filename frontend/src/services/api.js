@@ -27,4 +27,27 @@ api.interceptors.response.use(
   }
 );
 
+export function apiAssetUrl(assetPath) {
+  if (!assetPath) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(assetPath)) {
+    return assetPath;
+  }
+
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL || "";
+
+  const normalizedBase = baseUrl.endsWith("/")
+    ? baseUrl.slice(0, -1)
+    : baseUrl;
+
+  const normalizedPath = assetPath.startsWith("/")
+    ? assetPath
+    : `/${assetPath}`;
+
+  return `${normalizedBase}${normalizedPath}`;
+}
+
 export default api;
