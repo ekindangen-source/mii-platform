@@ -36,6 +36,7 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
   canDeleteModule,
@@ -155,6 +156,8 @@ export default function Engines() {
 
   const [actionAnchor, setActionAnchor] = useState(null);
   const [actionEngine, setActionEngine] = useState(null);
+
+  const [selectedEngine, setSelectedEngine] = useState(null);
 
   async function loadData() {
     try {
@@ -439,6 +442,7 @@ export default function Engines() {
   }
 
   function openActionMenu(event, engine) {
+    event.stopPropagation();
     setActionAnchor(event.currentTarget);
     setActionEngine(engine);
   }
@@ -463,6 +467,129 @@ export default function Engines() {
 
     closeActionMenu();
   }
+
+  function editSelectedEngine() {
+    if (!selectedEngine) {
+      return;
+    }
+
+    const engine = selectedEngine;
+    setSelectedEngine(null);
+    openEditDialog(engine);
+  }
+
+  function deleteSelectedEngine() {
+    if (!selectedEngine) {
+      return;
+    }
+
+    setDeleteTarget(selectedEngine);
+    setSelectedEngine(null);
+  }
+
+  const engineDetailSections = selectedEngine
+    ? [
+        {
+          title: "Engine",
+          fields: [
+            {
+              label: "Engine ID",
+              value: selectedEngine.engine_id,
+              emphasize: true,
+            },
+            {
+              label: "Brand",
+              value: selectedEngine.brand,
+            },
+            {
+              label: "Model",
+              value: selectedEngine.model,
+              emphasize: true,
+            },
+            {
+              label: "Horsepower",
+              value: selectedEngine.hp,
+              type: "number",
+              suffix: "hp",
+            },
+            {
+              label: "Serial number",
+              value: selectedEngine.serial_number,
+            },
+            {
+              label: "Fuel type",
+              value: selectedEngine.fuel_type,
+            },
+          ],
+        },
+        {
+          title: "Assignment",
+          fields: [
+            {
+              label: "Vessel",
+              value: selectedEngine.vessel_name,
+            },
+            {
+              label: "Vessel ID",
+              value: selectedEngine.vessel_id,
+            },
+            {
+              label: "Customer",
+              value: selectedEngine.company,
+            },
+          ],
+        },
+        {
+          title: "Installation and usage",
+          fields: [
+            {
+              label: "Install date",
+              value: selectedEngine.install_date,
+              type: "date",
+            },
+            {
+              label: "Engine hours",
+              value: selectedEngine.engine_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Warranty expiry",
+              value: selectedEngine.warranty_expiry,
+              type: "date",
+            },
+          ],
+        },
+        {
+          title: "Drive setup",
+          fields: [
+            {
+              label: "Gear ratio",
+              value: selectedEngine.gear_ratio,
+            },
+            {
+              label: "Propeller",
+              value: selectedEngine.propeller,
+            },
+          ],
+        },
+        {
+          title: "System",
+          fields: [
+            {
+              label: "Created",
+              value: selectedEngine.created_at,
+              type: "dateTime",
+            },
+            {
+              label: "Last updated",
+              value: selectedEngine.updated_at,
+              type: "dateTime",
+            },
+          ],
+        },
+      ]
+    : [];
 
   return (
     <Box>
@@ -679,6 +806,20 @@ export default function Engines() {
                   <TableRow
                     key={engine.engine_id}
                     hover
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelectedEngine(engine)
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        setSelectedEngine(engine)
+                      }
+                    }}
+                    sx={{ cursor: "pointer" }}
                   >
                     <TableCell>
                       {engine.engine_id}
@@ -845,6 +986,21 @@ export default function Engines() {
           </MenuItem>
         )}
       </Menu>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedEngine)}
+        onClose={() => setSelectedEngine(null)}
+        title={
+          selectedEngine?.engine_name ||
+          "Engine details"
+        }
+        subtitle={selectedEngine?.engine_id}
+        sections={engineDetailSections}
+        canEdit={canWrite}
+        canDelete={canDelete}
+        onEdit={editSelectedEngine}
+        onDelete={deleteSelectedEngine}
+      />
 
       <Dialog
         open={formOpen}

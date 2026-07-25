@@ -16,6 +16,7 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
   canDeleteModule,
@@ -105,6 +106,8 @@ export default function Trips() {
 
   const [actionAnchor, setActionAnchor] = useState(null);
   const [actionTrip, setActionTrip] = useState(null);
+
+  const [selectedTrip, setSelectedTrip] = useState(null);
 
   async function loadData() {
     try {
@@ -323,6 +326,7 @@ export default function Trips() {
   }
 
   function openActionMenu(event, trip) {
+    event.stopPropagation();
     setActionAnchor(event.currentTarget);
     setActionTrip(trip);
   }
@@ -341,6 +345,136 @@ export default function Trips() {
     if (actionTrip) setDeleteTarget(actionTrip);
     closeActionMenu();
   }
+
+  function editSelectedTrip() {
+    if (!selectedTrip) {
+      return;
+    }
+
+    const trip = selectedTrip;
+    setSelectedTrip(null);
+    openEditDialog(trip);
+  }
+
+  function deleteSelectedTrip() {
+    if (!selectedTrip) {
+      return;
+    }
+
+    setDeleteTarget(selectedTrip);
+    setSelectedTrip(null);
+  }
+
+  const tripDetailSections = selectedTrip
+    ? [
+        {
+          title: "Trip",
+          fields: [
+            {
+              label: "Trip ID",
+              value: selectedTrip.trip_id,
+              emphasize: true,
+            },
+            {
+              label: "Trip date",
+              value: selectedTrip.trip_date,
+              type: "date",
+            },
+            {
+              label: "Vessel",
+              value: selectedTrip.vessel_name,
+              emphasize: true,
+            },
+            {
+              label: "Vessel ID",
+              value: selectedTrip.vessel_id,
+            },
+            {
+              label: "Customer",
+              value: selectedTrip.company,
+            },
+            {
+              label: "Captain",
+              value: selectedTrip.captain,
+            },
+          ],
+        },
+        {
+          title: "Operation",
+          fields: [
+            {
+              label: "Operating hours",
+              value: selectedTrip.operating_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Distance",
+              value: selectedTrip.distance_nm,
+              type: "number",
+              suffix: "NM",
+            },
+            {
+              label: "Average speed",
+              value: selectedTrip.average_speed_kn,
+              type: "number",
+              suffix: "kn",
+            },
+            {
+              label: "Payload",
+              value: selectedTrip.payload,
+              fullWidth: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "Energy",
+          fields: [
+            {
+              label: "Fuel used",
+              value: selectedTrip.fuel_used_l,
+              type: "number",
+              suffix: "L",
+            },
+            {
+              label: "Fuel price per litre",
+              value: selectedTrip.fuel_price_per_l,
+              type: "currency",
+            },
+            {
+              label: "Electricity",
+              value: selectedTrip.electricity_kwh,
+              type: "number",
+              suffix: "kWh",
+            },
+          ],
+        },
+        {
+          title: "Conditions",
+          fields: [
+            {
+              label: "Weather",
+              value: selectedTrip.weather,
+            },
+            {
+              label: "Sea state",
+              value: selectedTrip.sea_state,
+            },
+          ],
+        },
+        {
+          title: "System",
+          fields: [
+            {
+              label: "Created",
+              value: selectedTrip.created_at,
+              type: "dateTime",
+            },
+          ],
+        },
+      ]
+    : [];
 
   return (
     <Box>
@@ -475,7 +609,24 @@ export default function Trips() {
 
               <TableBody>
                 {visibleTrips.map((trip) => (
-                  <TableRow key={trip.trip_id} hover>
+                  <TableRow
+                    key={trip.trip_id}
+                    hover
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelectedTrip(trip)
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        setSelectedTrip(trip)
+                      }
+                    }}
+                    sx={{ cursor: "pointer" }}
+                  >
                     <TableCell>{trip.trip_id}</TableCell>
                     <TableCell>{formatDate(trip.trip_date) || "—"}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
@@ -578,6 +729,24 @@ export default function Trips() {
           </MenuItem>
         )}
       </Menu>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedTrip)}
+        onClose={() => setSelectedTrip(null)}
+        title={
+          selectedTrip?.trip_id ||
+          "Trip details"
+        }
+        subtitle={
+          selectedTrip?.vessel_name ||
+          selectedTrip?.vessel_id
+        }
+        sections={tripDetailSections}
+        canEdit={canWrite}
+        canDelete={canDelete}
+        onEdit={editSelectedTrip}
+        onDelete={deleteSelectedTrip}
+      />
 
       <Dialog open={formOpen} onClose={closeFormDialog} fullWidth maxWidth="md">
         <Box component="form" onSubmit={handleSubmit}>

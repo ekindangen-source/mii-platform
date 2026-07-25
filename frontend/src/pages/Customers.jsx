@@ -36,6 +36,7 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
   canDeleteModule,
@@ -133,6 +134,8 @@ export default function Customers() {
 
   const [actionAnchor, setActionAnchor] = useState(null);
   const [actionCustomer, setActionCustomer] = useState(null);
+
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   async function loadCustomers() {
     try {
@@ -334,6 +337,7 @@ export default function Customers() {
   }
 
   function openActionMenu(event, customer) {
+    event.stopPropagation();
     setActionAnchor(event.currentTarget);
     setActionCustomer(customer);
   }
@@ -358,6 +362,135 @@ export default function Customers() {
 
     closeActionMenu();
   }
+
+  function editSelectedCustomer() {
+    if (!selectedCustomer) {
+      return;
+    }
+
+    const customer = selectedCustomer;
+    setSelectedCustomer(null);
+    openEditDialog(customer);
+  }
+
+  function deleteSelectedCustomer() {
+    if (!selectedCustomer) {
+      return;
+    }
+
+    setDeleteTarget(selectedCustomer);
+    setSelectedCustomer(null);
+  }
+
+  const customerDetailSections = selectedCustomer
+    ? [
+        {
+          title: "Customer",
+          fields: [
+            {
+              label: "Customer ID",
+              value: selectedCustomer.customer_id,
+              emphasize: true,
+            },
+            {
+              label: "Company",
+              value: selectedCustomer.company,
+              emphasize: true,
+            },
+            {
+              label: "Industry",
+              value: selectedCustomer.industry,
+            },
+          ],
+        },
+        {
+          title: "Contact",
+          fields: [
+            {
+              label: "Contact person",
+              value: selectedCustomer.contact_person,
+            },
+            {
+              label: "Position",
+              value: selectedCustomer.position,
+            },
+            {
+              label: "Email",
+              value: selectedCustomer.email,
+            },
+            {
+              label: "Telephone",
+              value: selectedCustomer.telephone,
+            },
+          ],
+        },
+        {
+          title: "Location and fleet",
+          fields: [
+            {
+              label: "Province",
+              value: selectedCustomer.province,
+            },
+            {
+              label: "Home port",
+              value: selectedCustomer.home_port,
+            },
+            {
+              label: "Fleet size",
+              value: selectedCustomer.fleet_size,
+              type: "number",
+            },
+            {
+              label: "Annual operating hours",
+              value:
+                selectedCustomer.annual_operating_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Address",
+              value: selectedCustomer.address,
+              fullWidth: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "Commercial",
+          fields: [
+            {
+              label: "Decision maker",
+              value: selectedCustomer.decision_maker,
+            },
+            {
+              label: "Current supplier",
+              value: selectedCustomer.current_supplier,
+            },
+            {
+              label: "Notes",
+              value: selectedCustomer.notes,
+              fullWidth: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "System",
+          fields: [
+            {
+              label: "Created",
+              value: selectedCustomer.created_at,
+              type: "dateTime",
+            },
+            {
+              label: "Last updated",
+              value: selectedCustomer.updated_at,
+              type: "dateTime",
+            },
+          ],
+        },
+      ]
+    : [];
 
   return (
     <Box>
@@ -564,6 +697,20 @@ export default function Customers() {
                   <TableRow
                     key={customer.customer_id}
                     hover
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelectedCustomer(customer)
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        setSelectedCustomer(customer)
+                      }
+                    }}
+                    sx={{ cursor: "pointer" }}
                   >
                     <TableCell>
                       {customer.customer_id}
@@ -714,6 +861,21 @@ export default function Customers() {
           </MenuItem>
         )}
       </Menu>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedCustomer)}
+        onClose={() => setSelectedCustomer(null)}
+        title={
+          selectedCustomer?.company ||
+          "Customer details"
+        }
+        subtitle={selectedCustomer?.customer_id}
+        sections={customerDetailSections}
+        canEdit={canWrite}
+        canDelete={canDelete}
+        onEdit={editSelectedCustomer}
+        onDelete={deleteSelectedCustomer}
+      />
 
       <Dialog
         open={formOpen}

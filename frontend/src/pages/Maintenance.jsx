@@ -17,6 +17,7 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
   canDeleteModule,
@@ -142,6 +143,8 @@ export default function Maintenance() {
 
   const [actionAnchor, setActionAnchor] = useState(null);
   const [actionRecord, setActionRecord] = useState(null);
+
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
   async function loadData() {
     try {
@@ -390,6 +393,7 @@ export default function Maintenance() {
   }
 
   function openActionMenu(event, record) {
+    event.stopPropagation();
     setActionAnchor(event.currentTarget);
     setActionRecord(record);
   }
@@ -408,6 +412,174 @@ export default function Maintenance() {
     if (actionRecord) setDeleteTarget(actionRecord);
     closeActionMenu();
   }
+
+  function editSelectedRecord() {
+    if (!selectedRecord) {
+      return;
+    }
+
+    const record = selectedRecord;
+    setSelectedRecord(null);
+    openEditDialog(record);
+  }
+
+  function deleteSelectedRecord() {
+    if (!selectedRecord) {
+      return;
+    }
+
+    setDeleteTarget(selectedRecord);
+    setSelectedRecord(null);
+  }
+
+  const maintenanceDetailSections = selectedRecord
+    ? [
+        {
+          title: "Maintenance",
+          fields: [
+            {
+              label: "Maintenance ID",
+              value: selectedRecord.maintenance_id,
+              emphasize: true,
+            },
+            {
+              label: "Service date",
+              value: selectedRecord.service_date,
+              type: "date",
+            },
+            {
+              label: "Status",
+              value: selectedRecord.status,
+            },
+            {
+              label: "Service type",
+              value: selectedRecord.service_type,
+            },
+            {
+              label: "Technician",
+              value: selectedRecord.technician,
+            },
+            {
+              label: "Warranty claim",
+              value: selectedRecord.warranty_claim,
+            },
+          ],
+        },
+        {
+          title: "Engine and vessel",
+          fields: [
+            {
+              label: "Engine",
+              value: selectedRecord.engine_name,
+              emphasize: true,
+            },
+            {
+              label: "Engine ID",
+              value: selectedRecord.engine_id,
+            },
+            {
+              label: "Serial number",
+              value: selectedRecord.serial_value,
+            },
+            {
+              label: "Vessel",
+              value: selectedRecord.vessel_name,
+            },
+            {
+              label: "Customer",
+              value: selectedRecord.customer_name,
+            },
+          ],
+        },
+        {
+          title: "Work and downtime",
+          fields: [
+            {
+              label: "Engine hours",
+              value: selectedRecord.engine_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Labor hours",
+              value: selectedRecord.labor_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Downtime",
+              value: selectedRecord.downtime_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Parts replaced",
+              value: selectedRecord.parts_replaced,
+              fullWidth: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "Costs",
+          fields: [
+            {
+              label: "Labor cost",
+              value: selectedRecord.labor_cost,
+              type: "currency",
+            },
+            {
+              label: "Parts cost",
+              value: selectedRecord.parts_cost,
+              type: "currency",
+            },
+            {
+              label: "Total cost",
+              value: selectedRecord.total_cost,
+              type: "currency",
+              emphasize: true,
+            },
+          ],
+        },
+        {
+          title: "Next service",
+          fields: [
+            {
+              label: "Next service date",
+              value: selectedRecord.next_service_date,
+              type: "date",
+            },
+            {
+              label: "Next service hours",
+              value: selectedRecord.next_service_hours,
+              type: "number",
+              suffix: "h",
+            },
+            {
+              label: "Remarks",
+              value: selectedRecord.remarks,
+              fullWidth: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "System",
+          fields: [
+            {
+              label: "Created",
+              value: selectedRecord.created_at,
+              type: "dateTime",
+            },
+            {
+              label: "Last updated",
+              value: selectedRecord.updated_at,
+              type: "dateTime",
+            },
+          ],
+        },
+      ]
+    : [];
 
   return (
     <Box>
@@ -539,7 +711,24 @@ export default function Maintenance() {
 
               <TableBody>
                 {visibleRecords.map((record) => (
-                  <TableRow key={record.maintenance_id} hover>
+                  <TableRow
+                    key={record.maintenance_id}
+                    hover
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelectedRecord(record)
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        setSelectedRecord(record)
+                      }
+                    }}
+                    sx={{ cursor: "pointer" }}
+                  >
                     <TableCell>{record.maintenance_id}</TableCell>
                     <TableCell>{formatDate(record.service_date) || "—"}</TableCell>
                     <TableCell>
@@ -651,6 +840,24 @@ export default function Maintenance() {
           </MenuItem>
         )}
       </Menu>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedRecord)}
+        onClose={() => setSelectedRecord(null)}
+        title={
+          selectedRecord?.maintenance_id ||
+          "Maintenance details"
+        }
+        subtitle={
+          selectedRecord?.engine_name ||
+          selectedRecord?.engine_id
+        }
+        sections={maintenanceDetailSections}
+        canEdit={canWrite}
+        canDelete={canDelete}
+        onEdit={editSelectedRecord}
+        onDelete={deleteSelectedRecord}
+      />
 
       <Dialog open={formOpen} onClose={closeFormDialog} fullWidth maxWidth="md">
         <Box component="form" onSubmit={handleSubmit}>

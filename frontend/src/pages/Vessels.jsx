@@ -36,6 +36,7 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
   canDeleteModule,
@@ -148,6 +149,8 @@ export default function Vessels() {
 
   const [actionAnchor, setActionAnchor] = useState(null);
   const [actionVessel, setActionVessel] = useState(null);
+
+  const [selectedVessel, setSelectedVessel] = useState(null);
 
   async function loadData() {
     try {
@@ -396,6 +399,7 @@ export default function Vessels() {
   }
 
   function openActionMenu(event, vessel) {
+    event.stopPropagation();
     setActionAnchor(event.currentTarget);
     setActionVessel(vessel);
   }
@@ -420,6 +424,133 @@ export default function Vessels() {
 
     closeActionMenu();
   }
+
+  function editSelectedVessel() {
+    if (!selectedVessel) {
+      return;
+    }
+
+    const vessel = selectedVessel;
+    setSelectedVessel(null);
+    openEdit(vessel);
+  }
+
+  function deleteSelectedVessel() {
+    if (!selectedVessel) {
+      return;
+    }
+
+    setDeleteTarget(selectedVessel);
+    setSelectedVessel(null);
+  }
+
+  const vesselDetailSections = selectedVessel
+    ? [
+        {
+          title: "Vessel",
+          fields: [
+            {
+              label: "Vessel ID",
+              value: selectedVessel.vessel_id,
+              emphasize: true,
+            },
+            {
+              label: "Boat name",
+              value: selectedVessel.boat_name,
+              emphasize: true,
+            },
+            {
+              label: "Customer",
+              value: selectedVessel.customer_name,
+            },
+            {
+              label: "Customer ID",
+              value: selectedVessel.customer_id,
+            },
+          ],
+        },
+        {
+          title: "Construction",
+          fields: [
+            {
+              label: "Builder",
+              value: selectedVessel.builder,
+            },
+            {
+              label: "Year built",
+              value: selectedVessel.year_built,
+              type: "number",
+            },
+            {
+              label: "Hull material",
+              value: selectedVessel.hull_material,
+            },
+            {
+              label: "Hull type",
+              value: selectedVessel.hull_type,
+            },
+          ],
+        },
+        {
+          title: "Dimensions and capacity",
+          fields: [
+            {
+              label: "Length",
+              value: selectedVessel.length_m,
+              type: "number",
+              suffix: "m",
+            },
+            {
+              label: "Beam",
+              value: selectedVessel.beam_m,
+              type: "number",
+              suffix: "m",
+            },
+            {
+              label: "Passenger capacity",
+              value: selectedVessel.passenger_capacity,
+              type: "number",
+            },
+            {
+              label: "Fuel tank",
+              value: selectedVessel.fuel_tank_l,
+              type: "number",
+              suffix: "L",
+            },
+          ],
+        },
+        {
+          title: "Operations",
+          fields: [
+            {
+              label: "Home port",
+              value: selectedVessel.home_port,
+            },
+            {
+              label: "Typical route",
+              value: selectedVessel.typical_route,
+              fullWidth: true,
+              multiline: true,
+            },
+          ],
+        },
+        {
+          title: "System",
+          fields: [
+            {
+              label: "Created",
+              value: selectedVessel.created_at,
+              type: "dateTime",
+            },
+            {
+              label: "Last updated",
+              value: selectedVessel.updated_at,
+              type: "dateTime",
+            },
+          ],
+        },
+      ]
+    : [];
 
   return (
     <Box>
@@ -636,6 +767,20 @@ export default function Vessels() {
                   <TableRow
                     key={vessel.vessel_id}
                     hover
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelectedVessel(vessel)
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        setSelectedVessel(vessel)
+                      }
+                    }}
+                    sx={{ cursor: "pointer" }}
                   >
                     <TableCell>
                       {vessel.vessel_id}
@@ -800,6 +945,21 @@ export default function Vessels() {
           </MenuItem>
         )}
       </Menu>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedVessel)}
+        onClose={() => setSelectedVessel(null)}
+        title={
+          selectedVessel?.boat_name ||
+          "Vessel details"
+        }
+        subtitle={selectedVessel?.vessel_id}
+        sections={vesselDetailSections}
+        canEdit={canWrite}
+        canDelete={canDelete}
+        onEdit={editSelectedVessel}
+        onDelete={deleteSelectedVessel}
+      />
 
       <Dialog
         open={formOpen}
