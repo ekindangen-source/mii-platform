@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import imageCompression from "browser-image-compression";
 import {
   Alert,
   Box,
@@ -92,8 +93,89 @@ const ALLOWED_PHOTO_TYPES = [
   "image/webp",
 ];
 
-const MAX_PHOTO_BYTES =
-  5 * 1024 * 1024;
+const MAX_SOURCE_PHOTO_BYTES =
+  25 * 1024 * 1024;
+
+const MAX_COMPRESSED_PHOTO_BYTES =
+  1024 * 1024;
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes)) {
+    return "";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const kilobytes = bytes / 1024;
+
+  if (kilobytes < 1024) {
+    return `${kilobytes.toFixed(0)} KB`;
+  }
+
+  return `${(kilobytes / 1024).toFixed(1)} MB`;
+}
+
+async function compressVesselPhoto(file) {
+  if (file.size <= MAX_COMPRESSED_PHOTO_BYTES) {
+    return file;
+  }
+
+  const attempts = [
+    {
+      maxSizeMB: 0.95,
+      maxWidthOrHeight: 1920,
+      initialQuality: 0.85,
+    },
+    {
+      maxSizeMB: 0.85,
+      maxWidthOrHeight: 1600,
+      initialQuality: 0.75,
+    },
+    {
+      maxSizeMB: 0.75,
+      maxWidthOrHeight: 1280,
+      initialQuality: 0.65,
+    },
+  ];
+
+  for (const options of attempts) {
+    const compressed = await imageCompression(
+      file,
+      {
+        ...options,
+        useWebWorker: true,
+        fileType: "image/webp",
+        preserveExif: false,
+      }
+    );
+
+    if (
+      compressed.size <=
+      MAX_COMPRESSED_PHOTO_BYTES
+    ) {
+      const baseName =
+        file.name.replace(/\.[^.]+$/, "") ||
+        "vessel-photo";
+
+      return new File(
+        [compressed],
+        `${baseName}.webp`,
+        {
+          type:
+            compressed.type ||
+            "image/webp",
+          lastModified: Date.now(),
+        }
+      );
+    }
+  }
+
+  throw new Error(
+    "The photo could not be compressed below 1 MB. Choose a smaller image."
+  );
+}
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -204,6 +286,10 @@ export default function Vessels() {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
+  const [photoCompressionInfo, setPhotoCompressionInfo] =
+    useState("");
+  const [compressingPhoto, setCompressingPhoto] =
+    useState(false);
   const [removePhoto, setRemovePhoto] = useState(false);
 
   async function loadData() {
@@ -329,6 +415,8 @@ export default function Vessels() {
     setForm(emptyForm);
     setPhotoFile(null);
     setPhotoPreview("");
+    setPhotoCompressionInfo("");
+    setCompressingPhoto(false);
     setRemovePhoto(false);
     setFormOpen(true);
   }
@@ -339,16 +427,18 @@ export default function Vessels() {
     setPhotoFile(null);
     setPhotoPreview(
       vesselPhotoUrl(
-                            vessel.photo_path,
-                            vessel.photo_url
-                          )
+        vessel.photo_path,
+        vessel.photo_url
+      )
     );
+    setPhotoCompressionInfo("");
+    setCompressingPhoto(false);
     setRemovePhoto(false);
     setFormOpen(true);
   }
 
   function closeForm() {
-    if (saving) {
+    if (saving || compressingPhoto) {
       return;
     }
 
@@ -357,10 +447,11 @@ export default function Vessels() {
     setForm(emptyForm);
     setPhotoFile(null);
     setPhotoPreview("");
+    setPhotoCompressionInfo("");
     setRemovePhoto(false);
   }
 
-  function handlePhotoChange(event) {
+  async function handlePhotoChange(event) {
     const file = event.target.files?.[0];
 
     event.target.value = "";
@@ -380,30 +471,69 @@ export default function Vessels() {
       return;
     }
 
-    if (file.size > MAX_PHOTO_BYTES) {
+    if (
+      file.size >
+      MAX_SOURCE_PHOTO_BYTES
+    ) {
       setError(
-        "Vessel photo must not exceed 5 MB"
+        "The original photo must not exceed 25 MB"
       );
       return;
     }
 
-    setError("");
-    setPhotoFile(file);
-    setRemovePhoto(false);
+    try {
+      setCompressingPhoto(true);
+      setError("");
+      setPhotoCompressionInfo("");
 
-    const reader = new FileReader();
+      const compressedFile =
+        await compressVesselPhoto(file);
 
-    reader.onload = () =>
-      setPhotoPreview(
-        String(reader.result || "")
+      if (
+        compressedFile.size >
+        MAX_COMPRESSED_PHOTO_BYTES
+      ) {
+        throw new Error(
+          "Compressed vessel photo must not exceed 1 MB"
+        );
+      }
+
+      const preview =
+        await fileToDataUrl(
+          compressedFile
+        );
+
+      setPhotoFile(compressedFile);
+      setPhotoPreview(preview);
+      setRemovePhoto(false);
+      setPhotoCompressionInfo(
+        file.size === compressedFile.size
+          ? `${formatFileSize(
+              compressedFile.size
+            )} — already within the 1 MB limit`
+          : `${formatFileSize(
+              file.size
+            )} → ${formatFileSize(
+              compressedFile.size
+            )}`
       );
-
-    reader.readAsDataURL(file);
+    } catch (compressionError) {
+      setPhotoFile(null);
+      setPhotoPreview("");
+      setPhotoCompressionInfo("");
+      setError(
+        compressionError.message ||
+          "Unable to compress vessel photo"
+      );
+    } finally {
+      setCompressingPhoto(false);
+    }
   }
 
   function clearPhoto() {
     setPhotoFile(null);
     setPhotoPreview("");
+    setPhotoCompressionInfo("");
     setRemovePhoto(Boolean(editingId));
   }
 
@@ -451,6 +581,13 @@ export default function Vessels() {
 
   async function submit(event) {
     event.preventDefault();
+
+    if (compressingPhoto) {
+      setError(
+        "Photo compression is still in progress"
+      );
+      return;
+    }
 
     if (!form.CustomerID.trim()) {
       setError("Customer is required");
@@ -1293,9 +1430,20 @@ export default function Vessels() {
                     variant="body2"
                     color="text.secondary"
                   >
-                    One JPG, PNG, or WebP photo,
-                    maximum 5 MB.
+                    JPG, PNG, or WebP. Photos are
+                    compressed to a maximum of 1 MB
+                    before upload.
                   </Typography>
+
+                  {photoCompressionInfo && (
+                    <Typography
+                      variant="caption"
+                      color="success.main"
+                      sx={{ fontWeight: 700 }}
+                    >
+                      {photoCompressionInfo}
+                    </Typography>
+                  )}
 
                   <Stack
                     sx={{
@@ -1307,18 +1455,28 @@ export default function Vessels() {
                     <Button
                       component="label"
                       variant="outlined"
+                      disabled={compressingPhoto}
                       startIcon={
-                        <PhotoCameraIcon />
+                        compressingPhoto ? (
+                          <CircularProgress
+                            size={16}
+                          />
+                        ) : (
+                          <PhotoCameraIcon />
+                        )
                       }
                     >
-                      {photoPreview
-                        ? "Replace photo"
-                        : "Choose photo"}
+                      {compressingPhoto
+                        ? "Compressing..."
+                        : photoPreview
+                          ? "Replace photo"
+                          : "Choose photo"}
 
                       <input
                         hidden
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
+                        disabled={compressingPhoto}
                         onChange={
                           handlePhotoChange
                         }
@@ -1331,6 +1489,7 @@ export default function Vessels() {
                         startIcon={
                           <DeleteIcon />
                         }
+                        disabled={compressingPhoto}
                         onClick={clearPhoto}
                       >
                         Remove
@@ -1494,7 +1653,7 @@ export default function Vessels() {
           <DialogActions>
             <Button
               onClick={closeForm}
-              disabled={saving}
+              disabled={saving || compressingPhoto}
             >
               Cancel
             </Button>
@@ -1502,13 +1661,15 @@ export default function Vessels() {
             <Button
               type="submit"
               variant="contained"
-              disabled={saving}
+              disabled={saving || compressingPhoto}
             >
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update vessel"
-                  : "Create vessel"}
+              {compressingPhoto
+                ? "Compressing photo..."
+                : saving
+                  ? "Saving..."
+                  : editingId
+                    ? "Update vessel"
+                    : "Create vessel"}
             </Button>
           </DialogActions>
         </Box>

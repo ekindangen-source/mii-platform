@@ -25,7 +25,7 @@ const LOCAL_PHOTO_DIRECTORY = path.join(
 );
 
 const MAX_PHOTO_BYTES =
-  5 * 1024 * 1024;
+  1024 * 1024;
 
 const PHOTO_TYPES = new Map([
   ["image/jpeg", ".jpg"],
@@ -134,7 +134,7 @@ function decodePhoto(body) {
 
   if (buffer.length > MAX_PHOTO_BYTES) {
     const error = new Error(
-      "Photo must not exceed 5 MB"
+      "Compressed vessel photo must not exceed 1 MB"
     );
     error.status = 413;
     throw error;
