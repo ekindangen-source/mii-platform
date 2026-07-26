@@ -119,9 +119,18 @@ function vesselPhotoUrl(
     return photoUrl;
   }
 
-  return photoPath
-    ? apiAssetUrl(photoPath)
-    : "";
+  // Legacy EC2-hosted photos use an API path.
+  if (
+    String(photoPath || "").startsWith(
+      "/uploads/"
+    )
+  ) {
+    return apiAssetUrl(photoPath);
+  }
+
+  // S3 object keys require a signed photo_url
+  // returned by the backend.
+  return "";
 }
 
 function mapRow(row) {
@@ -959,11 +968,15 @@ export default function Vessels() {
                     sx={{ cursor: "pointer" }}
                   >
                     <TableCell>
-                      {vessel.photo_path ? (
+                      {vesselPhotoUrl(
+                        vessel.photo_path,
+                        vessel.photo_url
+                      ) ? (
                         <Box
                           component="img"
                           src={vesselPhotoUrl(
-                            vessel.photo_path
+                            vessel.photo_path,
+                            vessel.photo_url
                           )}
                           alt={
                             vessel.boat_name ||
