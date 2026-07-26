@@ -26,6 +26,8 @@ $entries = @(
   "frontend/mii-frontend.tar.gz",
   "backend/uploads/vessels/*",
   "!backend/uploads/vessels/.gitignore"
+  "backend/node_modules/",
+  "frontend/node_modules/"
 )
 
 foreach ($entry in $entries) {
