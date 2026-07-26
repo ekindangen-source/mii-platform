@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
 
@@ -11,15 +10,19 @@ const {
   requireRole,
 } = require("../middleware/auth");
 
-const PHOTO_DIRECTORY = path.join(
+const {
+  addPhotoUrl,
+  deleteS3Photo,
+  isLegacyLocalPhotoPath,
+  uploadVesselPhoto,
+} = require("../services/vesselPhotoStorage");
+
+const LOCAL_PHOTO_DIRECTORY = path.join(
   __dirname,
   "..",
   "uploads",
   "vessels"
 );
-
-const PHOTO_PATH_PREFIX =
-  "/uploads/vessels/";
 
 const MAX_PHOTO_BYTES =
   5 * 1024 * 1024;
@@ -30,52 +33,47 @@ const PHOTO_TYPES = new Map([
   ["image/webp", ".webp"],
 ]);
 
-async function ensurePhotoDirectory() {
-  await fs.mkdir(
-    PHOTO_DIRECTORY,
-    { recursive: true }
-  );
-}
-
-function storedPhotoFilePath(photoPath) {
-  if (
-    !photoPath ||
-    !photoPath.startsWith(
-      PHOTO_PATH_PREFIX
-    )
-  ) {
-    return null;
-  }
-
-  const filename = path.basename(photoPath);
-
-  if (!filename) {
+function localPhotoFilePath(photoPath) {
+  if (!isLegacyLocalPhotoPath(photoPath)) {
     return null;
   }
 
   return path.join(
-    PHOTO_DIRECTORY,
-    filename
+    LOCAL_PHOTO_DIRECTORY,
+    path.basename(photoPath)
   );
 }
 
-async function removeStoredPhoto(photoPath) {
-  const filePath =
-    storedPhotoFilePath(photoPath);
+async function deleteStoredPhoto(photoPath) {
+  if (!photoPath) {
+    return;
+  }
 
-  if (!filePath) {
+  if (isLegacyLocalPhotoPath(photoPath)) {
+    const filePath =
+      localPhotoFilePath(photoPath);
+
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        console.error(
+          "Unable to remove legacy vessel photo:",
+          error.message
+        );
+      }
+    }
+
     return;
   }
 
   try {
-    await fs.unlink(filePath);
-  } catch (err) {
-    if (err.code !== "ENOENT") {
-      console.error(
-        "Unable to remove vessel photo:",
-        err
-      );
-    }
+    await deleteS3Photo(photoPath);
+  } catch (error) {
+    console.error(
+      "Unable to remove S3 vessel photo:",
+      error.message
+    );
   }
 }
 
@@ -100,21 +98,19 @@ function decodePhoto(body) {
     body?.DataBase64 || ""
   ).trim();
 
-  const dataUrlMatch = base64.match(
+  const match = base64.match(
     /^data:[^;]+;base64,(.*)$/s
   );
 
-  if (dataUrlMatch) {
-    base64 = dataUrlMatch[1];
+  if (match) {
+    base64 = match[1];
   }
 
   base64 = base64.replace(/\s+/g, "");
 
   if (
     !base64 ||
-    !/^[A-Za-z0-9+/]+={0,2}$/.test(
-      base64
-    )
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)
   ) {
     const error = new Error(
       "Invalid photo data"
@@ -147,17 +143,14 @@ function decodePhoto(body) {
   return {
     buffer,
     extension,
+    mimeType,
   };
 }
 
 router.post(
   "/",
   requireAuth,
-  requireRole(
-    "admin",
-    "manager",
-    "sales"
-  ),
+  requireRole("admin", "manager", "sales"),
   async (req, res) => {
     try {
       const r = req.body;
@@ -199,12 +192,14 @@ router.post(
 
       return res.status(201).json({
         status: "OK",
-        vessel: result.rows[0],
+        vessel: await addPhotoUrl(
+          result.rows[0]
+        ),
       });
-    } catch (err) {
+    } catch (error) {
       return res.status(500).json({
         status: "ERROR",
-        message: err.message,
+        message: error.message,
       });
     }
   }
@@ -221,17 +216,20 @@ router.get(
            c.company
          FROM vessels v
          LEFT JOIN customers c
-           ON v.customer_id =
-              c.customer_id
+           ON v.customer_id=c.customer_id
          ORDER BY v.created_at DESC
          LIMIT 100`
       );
 
-      return res.json(result.rows);
-    } catch (err) {
+      const rows = await Promise.all(
+        result.rows.map(addPhotoUrl)
+      );
+
+      return res.json(rows);
+    } catch (error) {
       return res.status(500).json({
         status: "ERROR",
-        message: err.message,
+        message: error.message,
       });
     }
   }
@@ -240,11 +238,7 @@ router.get(
 router.put(
   "/:id",
   requireAuth,
-  requireRole(
-    "admin",
-    "manager",
-    "sales"
-  ),
+  requireRole("admin", "manager", "sales"),
   async (req, res) => {
     try {
       const r = req.body;
@@ -293,33 +287,30 @@ router.put(
 
       return res.json({
         status: "OK",
-        vessel: result.rows[0],
+        vessel: await addPhotoUrl(
+          result.rows[0]
+        ),
       });
-    } catch (err) {
+    } catch (error) {
       return res.status(500).json({
         status: "ERROR",
-        message: err.message,
+        message: error.message,
       });
     }
   }
 );
 
-// Upload or replace the single vessel photo.
 router.put(
   "/:id/photo",
   requireAuth,
-  requireRole(
-    "admin",
-    "manager",
-    "sales"
-  ),
+  requireRole("admin", "manager", "sales"),
   async (req, res) => {
-    let newFilePath = null;
+    let newObjectKey = null;
 
     try {
       const currentResult =
         await pool.query(
-          `SELECT photo_path
+          `SELECT vessel_id, photo_path
            FROM vessels
            WHERE vessel_id=$1`,
           [req.params.id]
@@ -335,26 +326,16 @@ router.put(
       const {
         buffer,
         extension,
+        mimeType,
       } = decodePhoto(req.body);
 
-      await ensurePhotoDirectory();
-
-      const filename =
-        `${crypto.randomUUID()}${extension}`;
-
-      newFilePath = path.join(
-        PHOTO_DIRECTORY,
-        filename
-      );
-
-      await fs.writeFile(
-        newFilePath,
-        buffer,
-        { flag: "wx" }
-      );
-
-      const newPhotoPath =
-        PHOTO_PATH_PREFIX + filename;
+      newObjectKey =
+        await uploadVesselPhoto({
+          vesselId: req.params.id,
+          buffer,
+          mimeType,
+          extension,
+        });
 
       const result = await pool.query(
         `UPDATE vessels
@@ -364,45 +345,42 @@ router.put(
          WHERE vessel_id=$2
          RETURNING *`,
         [
-          newPhotoPath,
+          newObjectKey,
           req.params.id,
         ]
       );
 
-      await removeStoredPhoto(
+      await deleteStoredPhoto(
         currentResult.rows[0].photo_path
       );
 
       return res.json({
         status: "OK",
-        vessel: result.rows[0],
+        vessel: await addPhotoUrl(
+          result.rows[0]
+        ),
       });
-    } catch (err) {
-      if (newFilePath) {
-        await fs
-          .unlink(newFilePath)
-          .catch(() => {});
+    } catch (error) {
+      if (newObjectKey) {
+        await deleteS3Photo(
+          newObjectKey
+        ).catch(() => {});
       }
 
       return res
-        .status(err.status || 500)
+        .status(error.status || 500)
         .json({
           status: "ERROR",
-          message: err.message,
+          message: error.message,
         });
     }
   }
 );
 
-// Remove the current vessel photo.
 router.delete(
   "/:id/photo",
   requireAuth,
-  requireRole(
-    "admin",
-    "manager",
-    "sales"
-  ),
+  requireRole("admin", "manager", "sales"),
   async (req, res) => {
     try {
       const result = await pool.query(
@@ -438,7 +416,7 @@ router.delete(
 
       const row = result.rows[0];
 
-      await removeStoredPhoto(
+      await deleteStoredPhoto(
         row.previous_photo_path
       );
 
@@ -446,25 +424,21 @@ router.delete(
 
       return res.json({
         status: "OK",
-        vessel: row,
+        vessel: await addPhotoUrl(row),
       });
-    } catch (err) {
+    } catch (error) {
       return res.status(500).json({
         status: "ERROR",
-        message: err.message,
+        message: error.message,
       });
     }
   }
 );
 
-// Delete the vessel and its stored photo.
 router.delete(
   "/:id",
   requireAuth,
-  requireRole(
-    "admin",
-    "manager"
-  ),
+  requireRole("admin", "manager"),
   async (req, res) => {
     try {
       const result = await pool.query(
@@ -481,7 +455,7 @@ router.delete(
         });
       }
 
-      await removeStoredPhoto(
+      await deleteStoredPhoto(
         result.rows[0].photo_path
       );
 
@@ -490,10 +464,10 @@ router.delete(
         message: "Vessel deleted",
         vessel: result.rows[0],
       });
-    } catch (err) {
+    } catch (error) {
       return res.status(500).json({
         status: "ERROR",
-        message: err.message,
+        message: error.message,
       });
     }
   }

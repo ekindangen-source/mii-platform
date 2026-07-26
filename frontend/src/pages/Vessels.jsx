@@ -111,7 +111,14 @@ function fileToDataUrl(file) {
   });
 }
 
-function vesselPhotoUrl(photoPath) {
+function vesselPhotoUrl(
+  photoPath,
+  photoUrl
+) {
+  if (photoUrl) {
+    return photoUrl;
+  }
+
   return photoPath
     ? apiAssetUrl(photoPath)
     : "";
@@ -322,7 +329,10 @@ export default function Vessels() {
     setForm(mapRow(vessel));
     setPhotoFile(null);
     setPhotoPreview(
-      vesselPhotoUrl(vessel.photo_path)
+      vesselPhotoUrl(
+                            vessel.photo_path,
+                            vessel.photo_url
+                          )
     );
     setRemovePhoto(false);
     setFormOpen(true);
@@ -1160,7 +1170,8 @@ export default function Vessels() {
         }
         subtitle={selectedVessel?.vessel_id}
         imageSrc={vesselPhotoUrl(
-          selectedVessel?.photo_path
+          selectedVessel?.photo_path,
+          selectedVessel?.photo_url
         )}
         imageAlt={
           selectedVessel?.boat_name ||
