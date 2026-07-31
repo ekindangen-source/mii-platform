@@ -31,10 +31,11 @@ router.post(
         email,
         telephone,
         address,
-        notes
+        notes,
+        lead_source
       )
       VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING *`,
       [
         r.Company,
@@ -51,6 +52,7 @@ router.post(
         r.Telephone,
         r.Address,
         r.Notes,
+        r.Source,
       ]
     );
 
@@ -112,8 +114,9 @@ router.put(
          telephone=$12,
          address=$13,
          notes=$14,
+         lead_source=$15,
          updated_at=NOW()
-       WHERE customer_id=$15
+       WHERE customer_id=$16
        RETURNING *`,
       [
         r.Company,
@@ -130,6 +133,7 @@ router.put(
         r.Telephone,
         r.Address,
         r.Notes,
+        r.Source,
         req.params.id,
       ]
     );

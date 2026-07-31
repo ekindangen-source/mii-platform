@@ -84,8 +84,9 @@ const navigationGroups = [
       },
       {
         label: "Settings",
+        path: "/settings",
         icon: <SettingsIcon />,
-        disabled: true,
+        adminOnly: true,
       },
     ],
   },

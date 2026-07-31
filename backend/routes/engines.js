@@ -27,9 +27,10 @@ router.post(
         gear_ratio,
         propeller,
         warranty_expiry,
-        fuel_type
+        fuel_type,
+        engine_type
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *`,
       [
         r.VesselID,
@@ -43,6 +44,7 @@ router.post(
         r.Propeller,
         r.WarrantyExpiry || null,
         r.FuelType,
+        r.EngineType,
       ]
     );
 
@@ -108,8 +110,9 @@ router.put(
          propeller=$9,
          warranty_expiry=$10,
          fuel_type=$11,
+         engine_type=$12,
          updated_at=NOW()
-       WHERE engine_id=$12
+       WHERE engine_id=$13
        RETURNING *`,
       [
         r.VesselID,
@@ -123,6 +126,7 @@ router.put(
         r.Propeller,
         r.WarrantyExpiry || null,
         r.FuelType,
+        r.EngineType,
         req.params.id,
       ]
     );
