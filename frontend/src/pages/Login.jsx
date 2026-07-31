@@ -11,6 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 
+import { APP_VERSION_LABEL } from "../config/appVersion";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -66,7 +67,7 @@ export default function Login() {
               gutterBottom
               sx={{ fontWeight: 700 }}
             >
-              MII CRM
+              MII Platform
             </Typography>
 
             <Typography color="text.secondary" sx={{ mb: 3 }}>
@@ -112,6 +113,30 @@ export default function Login() {
               >
                 {submitting ? "Signing in..." : "Sign in"}
               </Button>
+            </Box>
+
+            <Box
+              sx={{
+                mt: 3,
+                pt: 2,
+                borderTop: "1px solid",
+                borderColor: "divider",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                MII Platform
+              </Typography>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 700 }}
+              >
+                {APP_VERSION_LABEL}
+              </Typography>
             </Box>
           </CardContent>
         </Card>

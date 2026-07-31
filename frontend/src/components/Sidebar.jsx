@@ -21,6 +21,10 @@ import SettingsIcon from "@mui/icons-material/Settings";
 
 import { NavLink } from "react-router-dom";
 
+import {
+  APP_RELEASE_NAME,
+  APP_VERSION_LABEL,
+} from "../config/appVersion";
 import { useAuth } from "../context/AuthContext";
 
 const navigationGroups = [
@@ -95,7 +99,6 @@ export default function Sidebar({ onNavigate }) {
       onNavigate();
     }
   }
-
 
   return (
     <Box
@@ -206,52 +209,87 @@ export default function Sidebar({ onNavigate }) {
                     user?.role === "admin"
                 )
                 .map((item) => {
-                const commonSx = {
-                  minHeight: 44,
-                  px: 1.5,
-                  mb: 0.5,
-                  borderRadius: 2,
-                  color: "rgba(255,255,255,0.72)",
-                  transition:
-                    "background-color 150ms ease, color 150ms ease, transform 150ms ease",
-                  "& .MuiListItemIcon-root": {
-                    minWidth: 38,
-                    color: "rgba(255,255,255,0.48)",
-                    transition: "color 150ms ease",
-                  },
-                  "&:hover": {
-                    bgcolor: "rgba(255,255,255,0.075)",
-                    color: "common.white",
-                    transform: "translateX(2px)",
+                  const commonSx = {
+                    minHeight: 44,
+                    px: 1.5,
+                    mb: 0.5,
+                    borderRadius: 2,
+                    color: "rgba(255,255,255,0.72)",
+                    transition:
+                      "background-color 150ms ease, color 150ms ease, transform 150ms ease",
                     "& .MuiListItemIcon-root": {
-                      color: "primary.light",
+                      minWidth: 38,
+                      color: "rgba(255,255,255,0.48)",
+                      transition: "color 150ms ease",
                     },
-                  },
-                  "&.active": {
-                    bgcolor: "rgba(15,118,110,0.28)",
-                    color: "common.white",
-                    boxShadow:
-                      "inset 3px 0 0 #2dd4bf",
-                    "& .MuiListItemIcon-root": {
-                      color: "#5eead4",
+                    "&:hover": {
+                      bgcolor: "rgba(255,255,255,0.075)",
+                      color: "common.white",
+                      transform: "translateX(2px)",
+                      "& .MuiListItemIcon-root": {
+                        color: "primary.light",
+                      },
                     },
-                    "& .MuiListItemText-primary": {
-                      fontWeight: 700,
+                    "&.active": {
+                      bgcolor: "rgba(15,118,110,0.28)",
+                      color: "common.white",
+                      boxShadow:
+                        "inset 3px 0 0 #2dd4bf",
+                      "& .MuiListItemIcon-root": {
+                        color: "#5eead4",
+                      },
+                      "& .MuiListItemText-primary": {
+                        fontWeight: 700,
+                      },
                     },
-                  },
-                  "&.Mui-disabled": {
-                    color: "rgba(255,255,255,0.26)",
-                    "& .MuiListItemIcon-root": {
-                      color: "rgba(255,255,255,0.20)",
+                    "&.Mui-disabled": {
+                      color: "rgba(255,255,255,0.26)",
+                      "& .MuiListItemIcon-root": {
+                        color: "rgba(255,255,255,0.20)",
+                      },
                     },
-                  },
-                };
+                  };
 
-                if (item.disabled) {
+                  if (item.disabled) {
+                    return (
+                      <ListItemButton
+                        key={item.label}
+                        disabled
+                        sx={commonSx}
+                      >
+                        <ListItemIcon>
+                          {item.icon}
+                        </ListItemIcon>
+
+                        <ListItemText
+                          primary={item.label}
+                          secondary="Coming soon"
+                          slotProps={{
+                            primary: {
+                              sx: {
+                                fontSize: 14,
+                              },
+                            },
+                            secondary: {
+                              sx: {
+                                fontSize: 10,
+                                color:
+                                  "rgba(255,255,255,0.22)",
+                              },
+                            },
+                          }}
+                        />
+                      </ListItemButton>
+                    );
+                  }
+
                   return (
                     <ListItemButton
-                      key={item.label}
-                      disabled
+                      key={item.path}
+                      component={NavLink}
+                      to={item.path}
+                      end={item.path === "/"}
+                      onClick={handleNavigate}
                       sx={commonSx}
                     >
                       <ListItemIcon>
@@ -260,58 +298,53 @@ export default function Sidebar({ onNavigate }) {
 
                       <ListItemText
                         primary={item.label}
-                        secondary="Coming soon"
                         slotProps={{
                           primary: {
                             sx: {
                               fontSize: 14,
-                            },
-                          },
-                          secondary: {
-                            sx: {
-                              fontSize: 10,
-                              color:
-                                "rgba(255,255,255,0.22)",
+                              fontWeight: 500,
                             },
                           },
                         }}
                       />
                     </ListItemButton>
                   );
-                }
-
-                return (
-                  <ListItemButton
-                    key={item.path}
-                    component={NavLink}
-                    to={item.path}
-                    end={item.path === "/"}
-                    onClick={handleNavigate}
-                    sx={commonSx}
-                  >
-                    <ListItemIcon>
-                      {item.icon}
-                    </ListItemIcon>
-
-                    <ListItemText
-                      primary={item.label}
-                      slotProps={{
-                        primary: {
-                          sx: {
-                            fontSize: 14,
-                            fontWeight: 500,
-                          },
-                        },
-                      }}
-                    />
-                  </ListItemButton>
-                );
-              })}
+                })}
             </List>
           </Box>
         ))}
       </Box>
 
+      <Divider
+        sx={{
+          borderColor: "rgba(255,255,255,0.08)",
+        }}
+      />
+
+      <Box sx={{ px: 2.25, py: 1.5 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            color: "rgba(255,255,255,0.68)",
+            fontWeight: 700,
+          }}
+        >
+          MII Platform {APP_VERSION_LABEL}
+        </Typography>
+
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            mt: 0.25,
+            color: "rgba(255,255,255,0.34)",
+            fontSize: 10,
+          }}
+        >
+          {APP_RELEASE_NAME}
+        </Typography>
+      </Box>
     </Box>
   );
 }

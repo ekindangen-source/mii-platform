@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const path = require("path");
 const express = require("express");
@@ -6,6 +6,9 @@ const cors = require("cors");
 
 const pool = require("./db/database");
 const { requireAuth } = require("./middleware/auth");
+const {
+  startDailySummaryJob,
+} = require("./jobs/dailySummaryJob");
 
 const app = express();
 
@@ -125,6 +128,8 @@ app.use((err, _req, res, _next) => {
   });
 });
 
+startDailySummaryJob();
+
 const PORT = Number(process.env.PORT) || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
@@ -132,3 +137,4 @@ app.listen(PORT, "0.0.0.0", () => {
     `MII CRM API running on port ${PORT}`
   );
 });
+
