@@ -12,6 +12,7 @@ import {
 
 import DashboardLayout from "./layouts/DashboardLayout";
 import Login from "./pages/Login";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
 import Vessels from "./pages/Vessels";
@@ -48,6 +49,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
       <Route
         element={

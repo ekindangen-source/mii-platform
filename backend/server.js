@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 
 const path = require("path");
 const express = require("express");
@@ -10,6 +10,8 @@ const {
   startDailySummaryJob,
 } = require("./jobs/dailySummaryJob");
 
+const adminUsersRoutes = require("./routes/adminUsers");
+const invitationsRoutes = require("./routes/invitations");
 const app = express();
 
 app.use(cors());
@@ -75,6 +77,17 @@ app.get("/health/db", async (_req, res) => {
 
 app.use("/auth", require("./routes/auth"));
 
+app.use("/admin/users", adminUsersRoutes);
+app.use("/invitations", invitationsRoutes);
+
+app.post("/users", (_req, res) => {
+  res.status(410).json({
+    status: "ERROR",
+    message:
+      "Password-based user creation is disabled. Use the invitation workflow.",
+  });
+});
+
 app.use(
   "/customers",
   requireAuth,
@@ -137,4 +150,3 @@ app.listen(PORT, "0.0.0.0", () => {
     `MII CRM API running on port ${PORT}`
   );
 });
-
