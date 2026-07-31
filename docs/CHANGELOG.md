@@ -1,5 +1,10 @@
 # MII Platform Changelog
 
+## [1.2.1] — In Progress
+
+### Fixed
+- Customer Source is now visible in the customer detail popup.
+
 ## [1.2.0] — In Progress
 
 ### Added
