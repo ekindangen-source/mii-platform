@@ -89,6 +89,11 @@ app.post("/users", (_req, res) => {
 });
 
 app.use(
+  "/master-data",
+  requireAuth,
+  require("./routes/masterData.js")
+);
+app.use(
   "/customers",
   requireAuth,
   require("./routes/customers.js")

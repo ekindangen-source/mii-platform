@@ -1,4 +1,5 @@
 import packageJson from "../../package.json";
+
 export const APP_VERSION = packageJson.version;
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
-export const APP_RELEASE_NAME = "Secure User Invitations";
+export const APP_RELEASE_NAME = "Administration Master Data";

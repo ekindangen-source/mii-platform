@@ -1,5 +1,20 @@
 # MII Platform Changelog
 
+## [1.2.0] — In Progress
+
+### Added
+- Administration Master Data page for centrally managed dropdown values.
+- Customer Source dropdown.
+- Vessel Boat Builder, Material, and Type dropdowns.
+- Engine Brand, Type, and Fuel dropdowns.
+- Active/inactive and sort-order controls for master-data values.
+
+### Database
+- Added `master_data_categories` and `master_data_values`.
+- Added `customers.lead_source`.
+- Added `engines.engine_type`.
+- Existing operational values are imported into master data during migration.
+
 ## [1.1.0] — In Progress
 
 ### Added

@@ -39,6 +39,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import api, {
   apiAssetUrl,
 } from "../services/api";
+import useMasterData from "../hooks/useMasterData";
 import ConfirmDialog from "../components/ConfirmDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
@@ -61,23 +62,6 @@ const emptyForm = {
   HomePort: "",
   TypicalRoute: "",
 };
-
-const hullMaterials = [
-  "Fiberglass",
-  "Aluminum",
-  "Wood",
-  "Steel",
-  "HDPE",
-  "Other",
-];
-
-const hullTypes = [
-  "Monohull",
-  "Catamaran",
-  "Trimaran",
-  "RIB",
-  "Other",
-];
 
 const sortableColumns = [
   { id: "vessel_id", label: "Vessel ID" },
@@ -248,6 +232,12 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Vessels() {
+  const { valuesByCategory } = useMasterData([
+    "vessel_boat_builder",
+    "vessel_material",
+    "vessel_type",
+  ]);
+
   const { user } = useAuth();
   const canWrite = canWriteModule(
     user?.role,
@@ -275,6 +265,31 @@ export default function Vessels() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const boatBuilders = [
+    ...new Set(
+      [
+        ...(valuesByCategory.vessel_boat_builder || []),
+        form.Builder,
+      ].filter(Boolean)
+    ),
+  ];
+  const hullMaterials = [
+    ...new Set(
+      [
+        ...(valuesByCategory.vessel_material || []),
+        form.HullMaterial,
+      ].filter(Boolean)
+    ),
+  ];
+  const hullTypes = [
+    ...new Set(
+      [
+        ...(valuesByCategory.vessel_type || []),
+        form.HullType,
+      ].filter(Boolean)
+    ),
+  ];
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -1527,11 +1542,25 @@ export default function Vessels() {
               />
 
               <TextField
+                select
                 label="Builder"
                 name="Builder"
                 value={form.Builder}
                 onChange={change}
-              />
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+
+                {boatBuilders.map((builder) => (
+                  <MenuItem
+                    key={builder}
+                    value={builder}
+                  >
+                    {builder}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <TextField
                 label="Year built"

@@ -35,6 +35,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
+import useMasterData from "../hooks/useMasterData";
 import ConfirmDialog from "../components/ConfirmDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
@@ -55,26 +56,8 @@ const emptyForm = {
   Propeller: "",
   WarrantyExpiry: "",
   FuelType: "",
+  EngineType: "",
 };
-
-const engineBrands = [
-  "Yamaha",
-  "Suzuki",
-  "Mercury",
-  "Honda",
-  "Torqeedo",
-  "Volvo Penta",
-  "Cummins",
-  "Caterpillar",
-  "Other",
-];
-
-const fuelTypes = [
-  "Gasoline",
-  "Diesel",
-  "Electric",
-  "Hybrid",
-];
 
 const sortableColumns = [
   { id: "engine_id", label: "Engine ID" },
@@ -105,6 +88,7 @@ function mapRowToForm(row) {
     Propeller: row.propeller || "",
     WarrantyExpiry: formatDate(row.warranty_expiry),
     FuelType: row.fuel_type || "",
+    EngineType: row.engine_type || "",
   };
 }
 
@@ -124,6 +108,12 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Engines() {
+  const { valuesByCategory } = useMasterData([
+    "engine_brand",
+    "engine_type",
+    "engine_fuel",
+  ]);
+
   const { user } = useAuth();
   const canWrite = canWriteModule(
     user?.role,
@@ -152,6 +142,31 @@ export default function Engines() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const engineBrands = [
+    ...new Set(
+      [
+        ...(valuesByCategory.engine_brand || []),
+        form.Brand,
+      ].filter(Boolean)
+    ),
+  ];
+  const engineTypes = [
+    ...new Set(
+      [
+        ...(valuesByCategory.engine_type || []),
+        form.EngineType,
+      ].filter(Boolean)
+    ),
+  ];
+  const fuelTypes = [
+    ...new Set(
+      [
+        ...(valuesByCategory.engine_fuel || []),
+        form.FuelType,
+      ].filter(Boolean)
+    ),
+  ];
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [actionAnchor, setActionAnchor] = useState(null);
@@ -246,6 +261,7 @@ export default function Engines() {
         engine.engine_name,
         engine.serial_number,
         engine.fuel_type,
+        engine.engine_type,
         engine.company,
         engine.propeller,
         engine.gear_ratio,
@@ -1175,6 +1191,27 @@ export default function Engines() {
                     value={fuelType}
                   >
                     {fuelType}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                label="Engine type"
+                name="EngineType"
+                value={form.EngineType}
+                onChange={handleChange}
+              >
+                <MenuItem value="">
+                  <em>Select engine type</em>
+                </MenuItem>
+
+                {engineTypes.map((engineType) => (
+                  <MenuItem
+                    key={engineType}
+                    value={engineType}
+                  >
+                    {engineType}
                   </MenuItem>
                 ))}
               </TextField>

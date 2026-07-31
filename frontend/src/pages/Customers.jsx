@@ -35,6 +35,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
+import useMasterData from "../hooks/useMasterData";
 import ConfirmDialog from "../components/ConfirmDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +45,7 @@ import {
 } from "../utils/permissions";
 
 const emptyForm = {
+  Source: "",
   Company: "",
   Industry: "",
   ContactPerson: "",
@@ -70,6 +72,7 @@ const sortableColumns = [
 
 function mapRowToForm(row) {
   return {
+    Source: row.lead_source || "",
     Company: row.company || "",
     Industry: row.industry || "",
     ContactPerson: row.contact_person || "",
@@ -103,6 +106,10 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Customers() {
+  const { valuesByCategory } = useMasterData([
+    "customer_source",
+  ]);
+
   const { user } = useAuth();
   const canWrite = canWriteModule(
     user?.role,
@@ -128,6 +135,15 @@ export default function Customers() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const customerSources = [
+    ...new Set(
+      [
+        ...(valuesByCategory.customer_source || []),
+        form.Source,
+      ].filter(Boolean)
+    ),
+  ];
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -185,6 +201,7 @@ export default function Customers() {
         customer.province,
         customer.industry,
         customer.home_port,
+        customer.lead_source,
       ].some((value) =>
         String(value ?? "").toLowerCase().includes(query)
       )
@@ -905,6 +922,24 @@ export default function Customers() {
                 pt: 1,
               }}
             >
+              <TextField
+                select
+                label="Source"
+                name="Source"
+                value={form.Source}
+                onChange={handleChange}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+
+                {customerSources.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {value}
+                  </MenuItem>
+                ))}
+              </TextField>
+
               {[
                 ["Company", "Company", "text"],
                 ["Industry", "Industry", "text"],

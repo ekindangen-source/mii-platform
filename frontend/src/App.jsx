@@ -20,6 +20,7 @@ import Engines from "./pages/Engines";
 import Trips from "./pages/Trips";
 import Maintenance from "./pages/Maintenance";
 import Users from "./pages/Users";
+import Settings from "./pages/Settings";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -84,6 +85,14 @@ function AppRoutes() {
           element={
             <AdminRoute>
               <Users />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <AdminRoute>
+              <Settings />
             </AdminRoute>
           }
         />
