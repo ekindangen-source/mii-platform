@@ -22,7 +22,6 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import { NavLink } from "react-router-dom";
 
 import {
-  APP_RELEASE_NAME,
   APP_VERSION_LABEL,
 } from "../config/appVersion";
 import { useAuth } from "../context/AuthContext";
@@ -331,19 +330,7 @@ export default function Sidebar({ onNavigate }) {
             fontWeight: 700,
           }}
         >
-          MII Platform {APP_VERSION_LABEL}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          sx={{
-            display: "block",
-            mt: 0.25,
-            color: "rgba(255,255,255,0.34)",
-            fontSize: 10,
-          }}
-        >
-          {APP_RELEASE_NAME}
+          {APP_VERSION_LABEL}
         </Typography>
       </Box>
     </Box>

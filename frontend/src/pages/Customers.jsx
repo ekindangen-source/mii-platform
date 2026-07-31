@@ -415,6 +415,10 @@ export default function Customers() {
               emphasize: true,
             },
             {
+              label: "Source",
+              value: selectedCustomer.lead_source,
+            },
+            {
               label: "Industry",
               value: selectedCustomer.industry,
             },
