@@ -1,6 +1,17 @@
 # MII Platform Changelog
 
-## [1.4.0] — In Progress
+## [1.4.1] — In Progress
+
+### Added
+- Daily activity email now includes customer interactions grouped by the user who logged them.
+- Per-user interaction details include time, type, customer, PIC, participants, notes, next action, and follow-up date.
+- Interaction activity is selected by `interaction_at` using the configured daily-report timezone.
+- Added a non-email verification script for interaction counts and user grouping.
+
+### Database
+- No migration required; this release uses the v1.4.0 interaction attribution fields.
+
+## [1.4.0] — 2026-08-02
 
 ### Added
 - Customer interaction timeline linked to customer accounts and optional PICs.

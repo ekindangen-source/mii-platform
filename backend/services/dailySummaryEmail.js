@@ -285,6 +285,47 @@ const queries = {
       m.created_at,
       m.maintenance_id
   `,
+  interactions: `
+    SELECT
+      i.interaction_id,
+      i.customer_id,
+      c.company AS customer_name,
+      i.contact_id,
+      cc.full_name AS contact_name,
+      i.interaction_type,
+      i.interaction_at,
+      i.participants,
+      i.notes,
+      i.next_action,
+      i.next_action_date,
+      i.created_by,
+      COALESCE(
+        u.full_name,
+        'Legacy / Unknown'
+      ) AS created_by_name,
+      i.created_at
+    FROM customer_interactions i
+    INNER JOIN customers c
+      ON c.customer_id = i.customer_id
+    LEFT JOIN customer_contacts cc
+      ON cc.contact_id = i.contact_id
+      AND cc.customer_id = i.customer_id
+    LEFT JOIN app_users u
+      ON u.user_id = i.created_by
+    WHERE
+      i.interaction_at >= (
+        ($1::date)::timestamp
+        AT TIME ZONE $2
+      )
+      AND i.interaction_at < (
+        (($1::date + 1)::date)::timestamp
+        AT TIME ZONE $2
+      )
+    ORDER BY
+      COALESCE(u.full_name, 'Legacy / Unknown'),
+      i.interaction_at,
+      i.interaction_id
+  `,
 };
 
 async function loadDailySummary({
@@ -302,6 +343,7 @@ async function loadDailySummary({
     engines,
     trips,
     maintenance,
+    interactions,
   ] = await Promise.all([
     pool.query(
       queries.customers,
@@ -323,6 +365,10 @@ async function loadDailySummary({
       queries.maintenance,
       parameters
     ),
+    pool.query(
+      queries.interactions,
+      parameters
+    ),
   ]);
 
   return {
@@ -331,6 +377,7 @@ async function loadDailySummary({
     engines: engines.rows,
     trips: trips.rows,
     maintenance: maintenance.rows,
+    interactions: interactions.rows,
   };
 }
 
@@ -510,6 +557,266 @@ function renderCustomerUserSummaryText(rows) {
   ].join("\\n");
 }
 
+function formatInteractionType(value) {
+  const labels = {
+    call: "Call",
+    email: "Email",
+    meeting: "Meeting",
+    visit: "Visit",
+    whatsapp: "WhatsApp",
+    other: "Other",
+  };
+
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return labels[key] || displayValue(value);
+}
+
+function compactText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function summarizeInteractionsByUser(rows) {
+  const grouped = new Map();
+
+  rows.forEach((row) => {
+    const key = row.created_by || "legacy-unknown";
+    const name =
+      row.created_by_name || "Legacy / Unknown";
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        userId: row.created_by || null,
+        name,
+        rows: [],
+      });
+    }
+
+    grouped.get(key).rows.push(row);
+  });
+
+  return [...grouped.values()].sort(
+    (left, right) =>
+      right.rows.length - left.rows.length ||
+      left.name.localeCompare(right.name)
+  );
+}
+
+function renderInteractionUserSummaryHtml(rows) {
+  const groups = summarizeInteractionsByUser(rows);
+  const body = groups.length
+    ? groups
+        .map(
+          (group) => `
+            <tr>
+              <td style="
+                padding:8px;
+                border-bottom:1px solid #e5e7eb;
+              ">
+                ${escapeHtml(group.name)}
+              </td>
+              <td style="
+                padding:8px;
+                border-bottom:1px solid #e5e7eb;
+                text-align:right;
+                font-weight:bold;
+              ">
+                ${group.rows.length}
+              </td>
+            </tr>
+          `
+        )
+        .join("")
+    : `
+      <tr>
+        <td
+          colspan="2"
+          style="
+            padding:12px;
+            color:#64748b;
+            font-style:italic;
+          "
+        >
+          No customer interactions.
+        </td>
+      </tr>
+    `;
+
+  return `
+    <section style="margin:0 0 28px">
+      <h2 style="
+        margin:0 0 10px;
+        color:#17365d;
+        font-size:18px;
+      ">
+        Customer Interactions by User
+      </h2>
+      <div style="
+        max-width:520px;
+        border:1px solid #dbe3ec;
+        border-radius:8px;
+        overflow:hidden;
+      ">
+        <table
+          role="presentation"
+          style="
+            width:100%;
+            border-collapse:collapse;
+            font-size:13px;
+          "
+        >
+          <thead>
+            <tr style="
+              background:#eef4f8;
+              color:#17365d;
+              text-align:left;
+            ">
+              <th style="padding:8px">User</th>
+              <th style="
+                padding:8px;
+                text-align:right;
+              ">
+                Interactions
+              </th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderInteractionGroupsHtml({
+  rows,
+  timeZone,
+}) {
+  const groups = summarizeInteractionsByUser(rows);
+
+  if (!groups.length) {
+    return renderHtmlTable({
+      title: "Customer Interaction Details",
+      rows: [],
+      timeZone,
+      columns: [
+        { key: "interaction_time", label: "Time" },
+        { key: "interaction_type_label", label: "Type" },
+        { key: "customer_name", label: "Customer" },
+        { key: "contact_name", label: "PIC" },
+        { key: "notes", label: "Notes" },
+      ],
+    });
+  }
+
+  return groups
+    .map((group) =>
+      renderHtmlTable({
+        title: `Customer Interactions — ${group.name}`,
+        rows: group.rows.map((row) => ({
+          ...row,
+          interaction_time: formatTime(
+            row.interaction_at,
+            timeZone
+          ),
+          interaction_type_label:
+            formatInteractionType(
+              row.interaction_type
+            ),
+          contact_name:
+            row.contact_name || "—",
+          participants:
+            compactText(row.participants) || "—",
+          notes: compactText(row.notes),
+          next_action_display:
+            [
+              compactText(row.next_action),
+              row.next_action_date
+                ? `Due ${row.next_action_date}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "—",
+        })),
+        timeZone,
+        columns: [
+          { key: "interaction_time", label: "Time" },
+          {
+            key: "interaction_type_label",
+            label: "Type",
+          },
+          { key: "customer_name", label: "Customer" },
+          { key: "contact_name", label: "PIC" },
+          { key: "participants", label: "Participants" },
+          { key: "notes", label: "Notes" },
+          {
+            key: "next_action_display",
+            label: "Next Action",
+          },
+        ],
+      })
+    )
+    .join("");
+}
+
+function renderInteractionGroupsText(
+  rows,
+  timeZone
+) {
+  const groups = summarizeInteractionsByUser(rows);
+
+  if (!groups.length) {
+    return [
+      "Customer Interactions by User",
+      "- No customer interactions.",
+      "",
+    ].join("\n");
+  }
+
+  const lines = ["Customer Interactions by User"];
+
+  groups.forEach((group) => {
+    lines.push(
+      `${group.name} (${group.rows.length})`
+    );
+
+    group.rows.forEach((row) => {
+      const detail = [
+        formatTime(row.interaction_at, timeZone),
+        formatInteractionType(row.interaction_type),
+        row.customer_name,
+        row.contact_name
+          ? `PIC: ${row.contact_name}`
+          : null,
+        compactText(row.participants)
+          ? `Participants: ${compactText(
+              row.participants
+            )}`
+          : null,
+        compactText(row.notes),
+        compactText(row.next_action)
+          ? `Next: ${compactText(
+              row.next_action
+            )}`
+          : null,
+        row.next_action_date
+          ? `Due: ${row.next_action_date}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      lines.push(`- ${detail}`);
+    });
+  });
+
+  lines.push("");
+  return lines.join("\n");
+}
+
 function renderHtmlTable({
   title,
   rows,
@@ -633,7 +940,8 @@ function renderSummaryHtml({
     data.vessels.length +
     data.engines.length +
     data.trips.length +
-    data.maintenance.length;
+    data.maintenance.length +
+    data.interactions.length;
 
   const cards = [
     ["Customers", data.customers.length],
@@ -644,11 +952,12 @@ function renderSummaryHtml({
       "Maintenance",
       data.maintenance.length,
     ],
+    ["Interactions", data.interactions.length],
   ]
     .map(
       ([label, count]) => `
         <td style="
-          width:20%;
+          width:16.66%;
           padding:10px;
           text-align:center;
           background:#eef4f8;
@@ -705,7 +1014,7 @@ function renderSummaryHtml({
             ">
               ${escapeHtml(reportDate)}
               · ${escapeHtml(timeZone)}
-              · ${total} new record${
+              · ${total} activity item${
                 total === 1 ? "" : "s"
               }
             </div>
@@ -730,6 +1039,15 @@ function renderSummaryHtml({
             ${renderCustomerUserSummaryHtml(
               data.customers
             )}
+
+            ${renderInteractionUserSummaryHtml(
+              data.interactions
+            )}
+
+            ${renderInteractionGroupsHtml({
+              rows: data.interactions,
+              timeZone,
+            })}
 
             ${renderHtmlTable({
               title: "New Customers",
@@ -907,7 +1225,9 @@ function renderSummaryHtml({
               Customer additions show the application
               user who created each record. Customers
               created before v1.2.2 appear as
-              Legacy / Unknown.
+              Legacy / Unknown. Customer interactions
+              are grouped by the user who logged them
+              and are selected by interaction date/time.
             </p>
           </div>
         </div>
@@ -943,6 +1263,10 @@ function renderSummaryText({
     "",
     renderCustomerUserSummaryText(
       data.customers
+    ),
+    renderInteractionGroupsText(
+      data.interactions,
+      timeZone
     ),
     renderTextSection({
       title: "New Customers",
@@ -1041,7 +1365,8 @@ async function sendDailySummaryEmail({
     data.vessels.length +
     data.engines.length +
     data.trips.length +
-    data.maintenance.length;
+    data.maintenance.length +
+    data.interactions.length;
 
   const transporter = createTransporter();
 
@@ -1050,7 +1375,7 @@ async function sendDailySummaryEmail({
     to: config.recipients,
     subject:
       `MII Daily Activity — ${reportDate}` +
-      ` (${total} new)`,
+      ` (${total} items)`,
     text: renderSummaryText({
       reportDate,
       timeZone,
@@ -1074,6 +1399,8 @@ async function sendDailySummaryEmail({
       trips: data.trips.length,
       maintenance:
         data.maintenance.length,
+      interactions:
+        data.interactions.length,
     },
   };
 }
@@ -1086,5 +1413,6 @@ module.exports = {
   verifyEmailTransport,
   loadDailySummary,
   summarizeCustomersByUser,
+  summarizeInteractionsByUser,
   sendDailySummaryEmail,
 };
