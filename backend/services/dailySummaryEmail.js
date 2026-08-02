@@ -162,8 +162,16 @@ const queries = {
       c.email,
       c.province,
       c.home_port,
+      c.lead_source,
+      c.created_by,
+      COALESCE(
+        u.full_name,
+        'Legacy / Unknown'
+      ) AS created_by_name,
       c.created_at
     FROM customers c
+    LEFT JOIN app_users u
+      ON u.user_id = c.created_by
     WHERE
       c.created_at >= (
         ($1::date)::timestamp
@@ -363,6 +371,143 @@ function formatTime(value, timeZone) {
       hour12: false,
     }
   ).format(new Date(value));
+}
+
+function summarizeCustomersByUser(rows) {
+  const grouped = new Map();
+
+  rows.forEach((row) => {
+    const key =
+      row.created_by ||
+      "legacy-unknown";
+    const name =
+      row.created_by_name ||
+      "Legacy / Unknown";
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        userId: row.created_by || null,
+        name,
+        count: 0,
+      });
+    }
+
+    grouped.get(key).count += 1;
+  });
+
+  return [...grouped.values()].sort(
+    (left, right) =>
+      right.count - left.count ||
+      left.name.localeCompare(right.name)
+  );
+}
+
+function renderCustomerUserSummaryHtml(rows) {
+  const groups = summarizeCustomersByUser(
+    rows
+  );
+
+  const body = groups.length
+    ? groups
+        .map(
+          (group) => `
+            <tr>
+              <td style="
+                padding:8px;
+                border-bottom:1px solid #e5e7eb;
+              ">
+                ${escapeHtml(group.name)}
+              </td>
+              <td style="
+                padding:8px;
+                border-bottom:1px solid #e5e7eb;
+                text-align:right;
+                font-weight:bold;
+              ">
+                ${group.count}
+              </td>
+            </tr>
+          `
+        )
+        .join("")
+    : `
+      <tr>
+        <td
+          colspan="2"
+          style="
+            padding:12px;
+            color:#64748b;
+            font-style:italic;
+          "
+        >
+          No new customer additions.
+        </td>
+      </tr>
+    `;
+
+  return `
+    <section style="margin:0 0 28px">
+      <h2 style="
+        margin:0 0 10px;
+        color:#17365d;
+        font-size:18px;
+      ">
+        New Customers by User
+      </h2>
+
+      <div style="
+        max-width:520px;
+        border:1px solid #dbe3ec;
+        border-radius:8px;
+        overflow:hidden;
+      ">
+        <table
+          role="presentation"
+          style="
+            width:100%;
+            border-collapse:collapse;
+            font-size:13px;
+          "
+        >
+          <thead>
+            <tr style="
+              background:#eef4f8;
+              color:#17365d;
+              text-align:left;
+            ">
+              <th style="padding:8px">
+                User
+              </th>
+              <th style="
+                padding:8px;
+                text-align:right;
+              ">
+                Customers Added
+              </th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderCustomerUserSummaryText(rows) {
+  const groups = summarizeCustomersByUser(
+    rows
+  );
+
+  return [
+    "New Customers by User",
+    ...(groups.length
+      ? groups.map(
+          (group) =>
+            `- ${group.name}: ${group.count}`
+        )
+      : ["- No new customer additions."]),
+    "",
+  ].join("\\n");
 }
 
 function renderHtmlTable({
@@ -582,6 +727,10 @@ function renderSummaryHtml({
               <tr>${cards}</tr>
             </table>
 
+            ${renderCustomerUserSummaryHtml(
+              data.customers
+            )}
+
             ${renderHtmlTable({
               title: "New Customers",
               rows: data.customers,
@@ -606,6 +755,14 @@ function renderSummaryHtml({
                 {
                   key: "province",
                   label: "Province",
+                },
+                {
+                  key: "lead_source",
+                  label: "Source",
+                },
+                {
+                  key: "created_by_name",
+                  label: "Created By",
                 },
                 {
                   key: "created_at",
@@ -747,10 +904,10 @@ function renderSummaryHtml({
               color:#64748b;
               font-size:12px;
             ">
-              This report includes records created
-              during the stated WIB calendar day,
-              regardless of which application user
-              entered them.
+              Customer additions show the application
+              user who created each record. Customers
+              created before v1.2.2 appear as
+              Legacy / Unknown.
             </p>
           </div>
         </div>
@@ -784,6 +941,9 @@ function renderSummaryText({
     `MII Platform Daily Activity`,
     `${reportDate} · ${timeZone}`,
     "",
+    renderCustomerUserSummaryText(
+      data.customers
+    ),
     renderTextSection({
       title: "New Customers",
       rows: data.customers,
@@ -793,6 +953,11 @@ function renderSummaryText({
           row.company,
           row.contact_person,
           row.telephone,
+          row.lead_source,
+          `Created by: ${
+            row.created_by_name ||
+            "Legacy / Unknown"
+          }`,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -920,5 +1085,6 @@ module.exports = {
   validateEmailConfig,
   verifyEmailTransport,
   loadDailySummary,
+  summarizeCustomersByUser,
   sendDailySummaryEmail,
 };

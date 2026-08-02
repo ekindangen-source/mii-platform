@@ -1,5 +1,16 @@
 # MII Platform Changelog
 
+## [1.2.2] — In Progress
+
+### Added
+- Customer records now capture the authenticated user who created them.
+- Daily activity email groups new customers by user.
+- Daily customer rows show Source and Created By.
+- Existing customers without attribution display as `Legacy / Unknown`.
+
+### Database
+- Added nullable `customers.created_by` linked to `app_users.user_id`.
+
 ## [1.2.1] — In Progress
 
 ### Fixed
