@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: apiBaseUrl,
 });
 
 api.interceptors.request.use((config) => {
@@ -36,16 +38,21 @@ export function apiAssetUrl(assetPath) {
     return assetPath;
   }
 
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || "";
-
-  const normalizedBase = baseUrl.endsWith("/")
-    ? baseUrl.slice(0, -1)
-    : baseUrl;
+  const normalizedBase = apiBaseUrl.endsWith("/")
+    ? apiBaseUrl.slice(0, -1)
+    : apiBaseUrl;
 
   const normalizedPath = assetPath.startsWith("/")
     ? assetPath
     : `/${assetPath}`;
+
+  if (
+    normalizedBase &&
+    (normalizedPath === normalizedBase ||
+      normalizedPath.startsWith(`${normalizedBase}/`))
+  ) {
+    return normalizedPath;
+  }
 
   return `${normalizedBase}${normalizedPath}`;
 }
