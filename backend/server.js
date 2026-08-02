@@ -94,6 +94,11 @@ app.use(
   require("./routes/masterData.js")
 );
 app.use(
+  "/customers/:customerId/contacts",
+  requireAuth,
+  require("./routes/customerContacts.js")
+);
+app.use(
   "/customers",
   requireAuth,
   require("./routes/customers.js")

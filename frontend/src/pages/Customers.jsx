@@ -31,12 +31,14 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
 import api from "../services/api";
 import useMasterData from "../hooks/useMasterData";
 import ConfirmDialog from "../components/ConfirmDialog";
+import CustomerContactsDialog from "../components/CustomerContactsDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -45,6 +47,7 @@ import {
 } from "../utils/permissions";
 
 const emptyForm = {
+  AccountType: "organization",
   Source: "",
   Company: "",
   Industry: "",
@@ -65,13 +68,15 @@ const emptyForm = {
 const sortableColumns = [
   { id: "customer_id", label: "Customer ID" },
   { id: "company", label: "Company" },
-  { id: "contact_person", label: "Contact" },
+  { id: "primary_contact_name", label: "Contact" },
   { id: "province", label: "Province" },
   { id: "fleet_size", label: "Fleet", numeric: true },
 ];
 
 function mapRowToForm(row) {
   return {
+    AccountType:
+      row.account_type || "organization",
     Source: row.lead_source || "",
     Company: row.company || "",
     Industry: row.industry || "",
@@ -152,6 +157,7 @@ export default function Customers() {
   const [actionCustomer, setActionCustomer] = useState(null);
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [contactsCustomer, setContactsCustomer] = useState(null);
 
   async function loadCustomers() {
     try {
@@ -195,6 +201,9 @@ export default function Customers() {
       [
         customer.customer_id,
         customer.company,
+        customer.primary_contact_name,
+        customer.primary_contact_email,
+        customer.primary_contact_telephone,
         customer.contact_person,
         customer.email,
         customer.telephone,
@@ -364,6 +373,16 @@ export default function Customers() {
     setActionCustomer(null);
   }
 
+  function handleContactsFromMenu() {
+    const customer = actionCustomer;
+    closeActionMenu();
+
+    if (customer) {
+      setSelectedCustomer(null);
+      setContactsCustomer(customer);
+    }
+  }
+
   function handleEditFromMenu() {
     if (actionCustomer) {
       openEditDialog(actionCustomer);
@@ -415,6 +434,14 @@ export default function Customers() {
               emphasize: true,
             },
             {
+              label: "Account type",
+              value:
+                selectedCustomer.account_type ===
+                "individual"
+                  ? "Individual"
+                  : "Organization",
+            },
+            {
               label: "Source",
               value: selectedCustomer.lead_source,
             },
@@ -425,23 +452,37 @@ export default function Customers() {
           ],
         },
         {
-          title: "Contact",
+          title: "Primary contact",
           fields: [
             {
               label: "Contact person",
-              value: selectedCustomer.contact_person,
+              value:
+                selectedCustomer.primary_contact_name ||
+                selectedCustomer.contact_person,
             },
             {
               label: "Position",
-              value: selectedCustomer.position,
+              value:
+                selectedCustomer.primary_contact_job_title ||
+                selectedCustomer.position,
             },
             {
               label: "Email",
-              value: selectedCustomer.email,
+              value:
+                selectedCustomer.primary_contact_email ||
+                selectedCustomer.email,
             },
             {
               label: "Telephone",
-              value: selectedCustomer.telephone,
+              value:
+                selectedCustomer.primary_contact_telephone ||
+                selectedCustomer.telephone,
+            },
+            {
+              label: "Active contacts",
+              value:
+                selectedCustomer.active_contact_count,
+              type: "number",
             },
           ],
         },
@@ -539,7 +580,7 @@ export default function Customers() {
           </Typography>
 
           <Typography color="text.secondary">
-            Manage customer companies, contacts, and fleet
+            Manage customer accounts, PICs, and fleet
             information.
           </Typography>
         </Box>
@@ -656,7 +697,7 @@ export default function Customers() {
                       align={column.numeric ? "right" : "left"}
                       sx={{
                         display:
-                          column.id === "contact_person"
+                          column.id === "primary_contact_name"
                             ? {
                                 xs: "none",
                                 md: "table-cell",
@@ -761,7 +802,9 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.contact_person || "—"}
+                      {customer.primary_contact_name ||
+                        customer.contact_person ||
+                        "—"}
                     </TableCell>
 
                     <TableCell
@@ -787,7 +830,9 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.telephone || "—"}
+                      {customer.primary_contact_telephone ||
+                        customer.telephone ||
+                        "—"}
                     </TableCell>
 
                     <TableCell
@@ -798,22 +843,22 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.email || "—"}
+                      {customer.primary_contact_email ||
+                        customer.email ||
+                        "—"}
                     </TableCell>
 
                     <TableCell align="right">
-                      {(canWrite || canDelete) && (
-                        <Tooltip title="Customer actions">
-                                                <IconButton
-                                                  size="small"
-                                                  onClick={(event) =>
-                                                    openActionMenu(event, customer)
-                                                  }
-                                                >
-                                                  <MoreVertIcon />
-                                                </IconButton>
-                                              </Tooltip>
-                      )}
+                      <Tooltip title="Customer actions">
+                        <IconButton
+                          size="small"
+                          onClick={(event) =>
+                            openActionMenu(event, customer)
+                          }
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -859,6 +904,14 @@ export default function Customers() {
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
       >
+        <MenuItem onClick={handleContactsFromMenu}>
+          <PeopleAltIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Contacts / PICs
+        </MenuItem>
+
         {canWrite && (
           <MenuItem onClick={handleEditFromMenu}>
             <EditIcon
@@ -898,6 +951,14 @@ export default function Customers() {
         onDelete={deleteSelectedCustomer}
       />
 
+      <CustomerContactsDialog
+        open={Boolean(contactsCustomer)}
+        customer={contactsCustomer}
+        canWrite={canWrite}
+        onClose={() => setContactsCustomer(null)}
+        onChanged={loadCustomers}
+      />
+
       <Dialog
         open={formOpen}
         onClose={closeFormDialog}
@@ -928,6 +989,22 @@ export default function Customers() {
             >
               <TextField
                 select
+                label="Account type"
+                name="AccountType"
+                value={form.AccountType}
+                onChange={handleChange}
+                required
+              >
+                <MenuItem value="organization">
+                  Organization
+                </MenuItem>
+                <MenuItem value="individual">
+                  Individual
+                </MenuItem>
+              </TextField>
+
+              <TextField
+                select
                 label="Source"
                 name="Source"
                 value={form.Source}
@@ -947,12 +1024,6 @@ export default function Customers() {
               {[
                 ["Company", "Company", "text"],
                 ["Industry", "Industry", "text"],
-                [
-                  "ContactPerson",
-                  "Contact person",
-                  "text",
-                ],
-                ["Position", "Position", "text"],
                 ["Province", "Province", "text"],
                 ["HomePort", "Home port", "text"],
                 ["FleetSize", "Fleet size", "number"],
@@ -971,8 +1042,6 @@ export default function Customers() {
                   "Current supplier",
                   "text",
                 ],
-                ["Email", "Email", "email"],
-                ["Telephone", "Telephone", "text"],
               ].map(([name, label, type]) => (
                 <TextField
                   key={name}
