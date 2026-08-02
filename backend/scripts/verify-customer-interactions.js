@@ -4,7 +4,13 @@ const pool = require("../db/database");
 
 async function exists(query, values = []) {
   const result = await pool.query(query, values);
-  return Boolean(result.rows[0]?.exists);
+  const row = result.rows[0];
+
+  if (!row) {
+    return false;
+  }
+
+  return Boolean(Object.values(row)[0]);
 }
 
 async function main() {
