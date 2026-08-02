@@ -32,6 +32,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
+import HistoryIcon from "@mui/icons-material/History";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -39,6 +40,7 @@ import api from "../services/api";
 import useMasterData from "../hooks/useMasterData";
 import ConfirmDialog from "../components/ConfirmDialog";
 import CustomerContactsDialog from "../components/CustomerContactsDialog";
+import CustomerInteractionsDialog from "../components/CustomerInteractionsDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -158,6 +160,8 @@ export default function Customers() {
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [contactsCustomer, setContactsCustomer] = useState(null);
+  const [interactionsCustomer, setInteractionsCustomer] =
+    useState(null);
 
   async function loadCustomers() {
     try {
@@ -371,6 +375,16 @@ export default function Customers() {
   function closeActionMenu() {
     setActionAnchor(null);
     setActionCustomer(null);
+  }
+
+  function handleInteractionsFromMenu() {
+    const customer = actionCustomer;
+    closeActionMenu();
+
+    if (customer) {
+      setSelectedCustomer(null);
+      setInteractionsCustomer(customer);
+    }
   }
 
   function handleContactsFromMenu() {
@@ -904,6 +918,13 @@ export default function Customers() {
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
       >
+        <MenuItem onClick={handleInteractionsFromMenu}>
+          <HistoryIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Interactions
+        </MenuItem>
         <MenuItem onClick={handleContactsFromMenu}>
           <PeopleAltIcon
             fontSize="small"
@@ -951,6 +972,13 @@ export default function Customers() {
         onDelete={deleteSelectedCustomer}
       />
 
+      <CustomerInteractionsDialog
+        open={Boolean(interactionsCustomer)}
+        customer={interactionsCustomer}
+        canWrite={canWrite}
+        canDelete={canDelete}
+        onClose={() => setInteractionsCustomer(null)}
+      />
       <CustomerContactsDialog
         open={Boolean(contactsCustomer)}
         customer={contactsCustomer}

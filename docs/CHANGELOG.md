@@ -1,6 +1,24 @@
 # MII Platform Changelog
 
-## [1.3.0] — In Progress
+## [1.4.0] — In Progress
+
+### Added
+- Customer interaction timeline linked to customer accounts and optional PICs.
+- Interaction types for Call, Email, Meeting, Visit, WhatsApp, and Other.
+- Interaction date/time, participants, notes, next action, and follow-up date.
+- Multiple private S3 photos per interaction with browser-side compression.
+- Creator and updater attribution for interaction history.
+
+### Changed
+- Customer action menu now includes an Interactions workspace.
+- Frontend API configuration safely defaults to `/api` when `VITE_API_BASE_URL` is not explicitly set.
+
+### Database
+- Added `customer_interactions` with generated `INT-000000` references.
+- Added `customer_interaction_photos` with generated `IPH-000000` references.
+- Added indexes for chronological customer history and future follow-up queries.
+
+## [1.3.0] — 2026-08-02
 
 ### Added
 - Customer account type: Organization or Individual.

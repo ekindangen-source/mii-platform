@@ -16,8 +16,8 @@ const app = express();
 
 app.use(cors());
 
-// Vessel photos are sent as base64 JSON.
-// 8 MB comfortably supports a 5 MB image after base64 expansion.
+// Photo uploads are sent as base64 JSON.
+// 8 MB comfortably supports compressed vessel and interaction photos.
 app.use(express.json({ limit: "8mb" }));
 app.use(
   express.urlencoded({
@@ -97,6 +97,11 @@ app.use(
   "/customers/:customerId/contacts",
   requireAuth,
   require("./routes/customerContacts.js")
+);
+app.use(
+  "/customers/:customerId/interactions",
+  requireAuth,
+  require("./routes/customerInteractions.js")
 );
 app.use(
   "/customers",
