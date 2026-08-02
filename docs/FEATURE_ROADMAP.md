@@ -18,8 +18,8 @@ The visible application version is read from `frontend/package.json`.
 | v1.1.x | Released | Reporting & User Access | Daily email, visible version, roadmap, and secure invitations |
 | v1.2.0 | Released | Administration Master Data | Centralized dropdown lists for Customers, Vessels, and Engines |
 | v1.2.1 | Released | Customer Detail | Customer Source visible in popup and simplified sidebar version |
-| v1.2.2 | In Progress | Customer Attribution | Capture customer creator and group new customers by user in daily email |
-| v1.3.0 | Planned | Customer Account Foundation | Customer account and multiple PIC/contact structure |
+| v1.2.2 | Released | Customer Attribution | Capture customer creator and group new customers by user in daily email |
+| v1.3.0 | In Progress | Customer Account Foundation | Organization/individual accounts and multiple PIC/contact records |
 | v1.4.0 | Planned | Customer Interactions | Timeline, meeting notes, photos, next actions, and follow-ups |
 | v1.5.0 | Planned | Meeting & Visit Scheduling | Meetings, visits, reminders, and visit-to-interaction conversion |
 | v1.6.0 | Planned | Contact Cadence | Last-contact tracking and prioritized user reminder emails |

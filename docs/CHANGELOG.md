@@ -1,6 +1,26 @@
 # MII Platform Changelog
 
-## [1.2.2] — In Progress
+## [1.3.0] — In Progress
+
+### Added
+- Customer account type: Organization or Individual.
+- Multiple contacts/PICs under each customer account.
+- Add, edit, activate, deactivate, and set-primary contact actions.
+- Primary contact summary in the customer list and customer detail popup.
+- Contact creator/updater attribution for future audit use.
+
+### Changed
+- Customer account details are separated from PIC/contact details.
+- New customer contact information is maintained in the Contacts / PICs dialog.
+- Existing single-contact customer fields are retained as a backward-compatible fallback.
+
+### Database
+- Added `customers.account_type`.
+- Added `customer_contacts` with generated `PIC-000000` references.
+- Existing customer contact fields are migrated into one primary contact when present.
+- Enforced no more than one primary contact per customer.
+
+## [1.2.2] — 2026-08-02
 
 ### Added
 - Customer records now capture the authenticated user who created them.
@@ -11,12 +31,12 @@
 ### Database
 - Added nullable `customers.created_by` linked to `app_users.user_id`.
 
-## [1.2.1] — In Progress
+## [1.2.1] — 2026-08-02
 
 ### Fixed
 - Customer Source is now visible in the customer detail popup.
 
-## [1.2.0] — In Progress
+## [1.2.0] — 2026-08-02
 
 ### Added
 - Administration Master Data page for centrally managed dropdown values.
