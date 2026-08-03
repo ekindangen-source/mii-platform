@@ -35,6 +35,12 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import {
+  responsiveTableSx,
+  stickyActionCellSx,
+  stickyActionHeaderSx,
+  truncateTextSx,
+} from "../utils/responsiveTable";
 
 const emptyForm = {
   CategoryKey: "",
@@ -373,13 +379,13 @@ export default function Settings() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={responsiveTableSx}>
               <TableHead>
                 <TableRow>
                   <TableCell>Value</TableCell>
-                  <TableCell>Order</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Order</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" sx={stickyActionHeaderSx}>
                     Actions
                   </TableCell>
                 </TableRow>
@@ -392,11 +398,13 @@ export default function Settings() {
                       key={item.value_id}
                       hover
                     >
-                      <TableCell>
-                        {item.value}
+                      <TableCell sx={{ overflow: "hidden" }}>
+                        <Typography variant="body2" sx={truncateTextSx}>
+                          {item.value}
+                        </Typography>
                       </TableCell>
 
-                      <TableCell>
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                         {item.sort_order}
                       </TableCell>
 
@@ -416,7 +424,7 @@ export default function Settings() {
                         />
                       </TableCell>
 
-                      <TableCell align="right">
+                      <TableCell align="right" sx={stickyActionCellSx}>
                         <Tooltip title="Edit">
                           <IconButton
                             size="small"

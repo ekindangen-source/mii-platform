@@ -47,6 +47,13 @@ import {
   canDeleteModule,
   canWriteModule,
 } from "../utils/permissions";
+import {
+  primaryCellSx,
+  responsiveTableSx,
+  stickyActionCellSx,
+  stickyActionHeaderSx,
+  truncateTextSx,
+} from "../utils/responsiveTable";
 
 const emptyForm = {
   CustomerID: "",
@@ -64,8 +71,7 @@ const emptyForm = {
 };
 
 const sortableColumns = [
-  { id: "vessel_id", label: "Vessel ID" },
-  { id: "boat_name", label: "Boat name" },
+  { id: "boat_name", label: "Vessel" },
   { id: "customer_name", label: "Customer" },
   { id: "year_built", label: "Year", numeric: true },
   { id: "length_m", label: "Length (m)", numeric: true },
@@ -1014,7 +1020,7 @@ export default function Vessels() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={responsiveTableSx}>
               <TableHead>
                 <TableRow>
                   <TableCell
@@ -1060,40 +1066,7 @@ export default function Vessels() {
                     </TableCell>
                   ))}
 
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        lg: "table-cell",
-                      },
-                    }}
-                  >
-                    Builder
-                  </TableCell>
-
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        lg: "table-cell",
-                      },
-                    }}
-                  >
-                    Hull
-                  </TableCell>
-
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        md: "table-cell",
-                      },
-                    }}
-                  >
-                    Home port
-                  </TableCell>
-
-                  <TableCell align="right">
+                  <TableCell align="right" sx={stickyActionHeaderSx}>
                     Actions
                   </TableCell>
                 </TableRow>
@@ -1162,14 +1135,10 @@ export default function Vessels() {
                       )}
                     </TableCell>
 
-                    <TableCell>
-                      {vessel.vessel_id}
-                    </TableCell>
-
-                    <TableCell>
+                    <TableCell sx={primaryCellSx}>
                       <Typography
                         variant="body2"
-                        sx={{ fontWeight: 600 }}
+                        sx={{ fontWeight: 600, ...truncateTextSx }}
                       >
                         {vessel.boat_name ||
                           "Unnamed vessel"}
@@ -1178,8 +1147,11 @@ export default function Vessels() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        sx={truncateTextSx}
                       >
-                        {vessel.hull_type || "—"}
+                        {[vessel.vessel_id, vessel.hull_type]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
                       </Typography>
                     </TableCell>
 
@@ -1191,7 +1163,9 @@ export default function Vessels() {
                         },
                       }}
                     >
-                      {vessel.customer_name || "—"}
+                      <Typography variant="body2" sx={truncateTextSx}>
+                        {vessel.customer_name || "—"}
+                      </Typography>
                     </TableCell>
 
                     <TableCell
@@ -1209,42 +1183,7 @@ export default function Vessels() {
                       {vessel.length_m ?? "—"}
                     </TableCell>
 
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          lg: "table-cell",
-                        },
-                      }}
-                    >
-                      {vessel.builder || "—"}
-                    </TableCell>
-
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          lg: "table-cell",
-                        },
-                      }}
-                    >
-                      {[vessel.hull_material, vessel.hull_type]
-                        .filter(Boolean)
-                        .join(" / ") || "—"}
-                    </TableCell>
-
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          md: "table-cell",
-                        },
-                      }}
-                    >
-                      {vessel.home_port || "—"}
-                    </TableCell>
-
-                    <TableCell align="right">
+                    <TableCell align="right" sx={stickyActionCellSx}>
                       {(canWrite || canDelete) && (
                         <Tooltip title="Vessel actions">
                                                 <IconButton
@@ -1264,7 +1203,7 @@ export default function Vessels() {
                 {!visibleVessels.length && (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={6}
                       align="center"
                       sx={{ py: 5 }}
                     >

@@ -22,6 +22,13 @@ import {
   canDeleteModule,
   canWriteModule,
 } from "../utils/permissions";
+import {
+  primaryCellSx,
+  responsiveTableSx,
+  stickyActionCellSx,
+  stickyActionHeaderSx,
+  truncateTextSx,
+} from "../utils/responsiveTable";
 
 const emptyForm = {
   VesselID: "", Date: "", Captain: "",
@@ -33,8 +40,7 @@ const emptyForm = {
 const seaStates = ["Calm", "Slight", "Moderate", "Rough", "Very Rough"];
 
 const sortableColumns = [
-  { id: "trip_id", label: "Trip ID" },
-  { id: "trip_date", label: "Date" },
+  { id: "trip_date", label: "Trip" },
   { id: "vessel_name", label: "Vessel" },
   { id: "operating_hours", label: "Hours", numeric: true },
   { id: "distance_nm", label: "Distance (NM)", numeric: true },
@@ -565,7 +571,7 @@ export default function Trips() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={responsiveTableSx}>
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -591,19 +597,7 @@ export default function Trips() {
                     </TableCell>
                   ))}
 
-                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
-                    Captain
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{ display: { xs: "none", lg: "table-cell" } }}
-                  >
-                    Fuel (L)
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                    Sea state
-                  </TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell align="right" sx={stickyActionHeaderSx}>Actions</TableCell>
                 </TableRow>
               </TableHead>
 
@@ -627,13 +621,19 @@ export default function Trips() {
                     }}
                     sx={{ cursor: "pointer" }}
                   >
-                    <TableCell>{trip.trip_id}</TableCell>
-                    <TableCell>{formatDate(trip.trip_date) || "—"}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    <TableCell sx={primaryCellSx}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {formatDate(trip.trip_date) || "—"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={truncateTextSx}>
+                        {trip.trip_id}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, ...truncateTextSx }}>
                         {trip.vessel_name || "—"}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={truncateTextSx}>
                         {trip.company || "—"}
                       </Typography>
                     </TableCell>
@@ -646,19 +646,7 @@ export default function Trips() {
                     >
                       {trip.distance_nm ?? "—"}
                     </TableCell>
-                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
-                      {trip.captain || "—"}
-                    </TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{ display: { xs: "none", lg: "table-cell" } }}
-                    >
-                      {trip.fuel_used_l ?? "—"}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                      {trip.sea_state || "—"}
-                    </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" sx={stickyActionCellSx}>
                       {(canWrite || canDelete) && (
                         <Tooltip title="Trip actions">
                                                 <IconButton
@@ -675,7 +663,7 @@ export default function Trips() {
 
                 {!visibleTrips.length && (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
                       No trips found.
                     </TableCell>
                   </TableRow>

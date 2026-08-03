@@ -23,6 +23,13 @@ import {
   canDeleteModule,
   canWriteModule,
 } from "../utils/permissions";
+import {
+  primaryCellSx,
+  responsiveTableSx,
+  stickyActionCellSx,
+  stickyActionHeaderSx,
+  truncateTextSx,
+} from "../utils/responsiveTable";
 
 const emptyForm = {
   EngineID: "", ServiceDate: "",
@@ -44,8 +51,7 @@ const statuses = ["Open", "In Progress", "Completed", "Cancelled"];
 const warrantyOptions = ["No", "Yes", "Pending"];
 
 const sortableColumns = [
-  { id: "maintenance_id", label: "Maintenance ID" },
-  { id: "service_date", label: "Date" },
+  { id: "service_date", label: "Record" },
   { id: "engine_name", label: "Engine" },
   { id: "status", label: "Status" },
   { id: "engine_hours", label: "Engine hours", numeric: true },
@@ -670,7 +676,7 @@ export default function Maintenance() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={responsiveTableSx}>
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -696,16 +702,7 @@ export default function Maintenance() {
                     </TableCell>
                   ))}
 
-                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
-                    Vessel / Customer
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                    Service
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                    Technician
-                  </TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell align="right" sx={stickyActionHeaderSx}>Actions</TableCell>
                 </TableRow>
               </TableHead>
 
@@ -729,14 +726,22 @@ export default function Maintenance() {
                     }}
                     sx={{ cursor: "pointer" }}
                   >
-                    <TableCell>{record.maintenance_id}</TableCell>
-                    <TableCell>{formatDate(record.service_date) || "—"}</TableCell>
-                    <TableCell>
+                    <TableCell sx={primaryCellSx}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {formatDate(record.service_date) || "—"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={truncateTextSx}>
+                        {record.maintenance_id}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={primaryCellSx}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, ...truncateTextSx }}>
                         {record.engine_name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {record.serial_value}
+                      <Typography variant="caption" color="text.secondary" sx={truncateTextSx}>
+                        {[record.vessel_name, record.customer_name]
+                          .filter(Boolean)
+                          .join(" · ") || record.serial_value || "—"}
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
@@ -755,21 +760,7 @@ export default function Maintenance() {
                     <TableCell align="right">
                       {currency(record.total_cost)}
                     </TableCell>
-                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
-                      <Typography variant="body2">
-                        {record.vessel_name || "—"}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {record.customer_name || "—"}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                      {record.service_type || "—"}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                      {record.technician || "—"}
-                    </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" sx={stickyActionCellSx}>
                       {(canWrite || canDelete) && (
                         <Tooltip title="Maintenance actions">
                                                 <IconButton
@@ -786,7 +777,7 @@ export default function Maintenance() {
 
                 {!visibleRecords.length && (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
                       No maintenance records found.
                     </TableCell>
                   </TableRow>

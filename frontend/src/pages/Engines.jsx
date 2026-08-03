@@ -43,6 +43,13 @@ import {
   canDeleteModule,
   canWriteModule,
 } from "../utils/permissions";
+import {
+  primaryCellSx,
+  responsiveTableSx,
+  stickyActionCellSx,
+  stickyActionHeaderSx,
+  truncateTextSx,
+} from "../utils/responsiveTable";
 
 const emptyForm = {
   VesselID: "",
@@ -60,7 +67,6 @@ const emptyForm = {
 };
 
 const sortableColumns = [
-  { id: "engine_id", label: "Engine ID" },
   { id: "engine_name", label: "Engine" },
   { id: "vessel_name", label: "Vessel" },
   { id: "hp", label: "HP", numeric: true },
@@ -740,7 +746,7 @@ export default function Engines() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={responsiveTableSx}>
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -778,40 +784,7 @@ export default function Engines() {
                     </TableCell>
                   ))}
 
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        md: "table-cell",
-                      },
-                    }}
-                  >
-                    Customer
-                  </TableCell>
-
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        lg: "table-cell",
-                      },
-                    }}
-                  >
-                    Serial number
-                  </TableCell>
-
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        lg: "table-cell",
-                      },
-                    }}
-                  >
-                    Fuel type
-                  </TableCell>
-
-                  <TableCell align="right">
+                  <TableCell align="right" sx={stickyActionHeaderSx}>
                     Actions
                   </TableCell>
                 </TableRow>
@@ -837,14 +810,10 @@ export default function Engines() {
                     }}
                     sx={{ cursor: "pointer" }}
                   >
-                    <TableCell>
-                      {engine.engine_id}
-                    </TableCell>
-
-                    <TableCell>
+                    <TableCell sx={primaryCellSx}>
                       <Typography
                         variant="body2"
-                        sx={{ fontWeight: 600 }}
+                        sx={{ fontWeight: 600, ...truncateTextSx }}
                       >
                         {engine.engine_name}
                       </Typography>
@@ -852,12 +821,11 @@ export default function Engines() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        sx={truncateTextSx}
                       >
-                        {engine.install_date
-                          ? `Installed ${formatDate(
-                              engine.install_date
-                            )}`
-                          : "Installation date not recorded"}
+                        {[engine.engine_id, engine.serial_number]
+                          .filter(Boolean)
+                          .join(" · ") || "Serial not recorded"}
                       </Typography>
                     </TableCell>
 
@@ -869,7 +837,12 @@ export default function Engines() {
                         },
                       }}
                     >
-                      {engine.vessel_name || "—"}
+                      <Typography variant="body2" sx={truncateTextSx}>
+                        {engine.vessel_name || "—"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={truncateTextSx}>
+                        {engine.company || "—"}
+                      </Typography>
                     </TableCell>
 
                     <TableCell align="right">
@@ -888,40 +861,7 @@ export default function Engines() {
                       {engine.engine_hours ?? "—"}
                     </TableCell>
 
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          md: "table-cell",
-                        },
-                      }}
-                    >
-                      {engine.company || "—"}
-                    </TableCell>
-
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          lg: "table-cell",
-                        },
-                      }}
-                    >
-                      {engine.serial_number || "—"}
-                    </TableCell>
-
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          lg: "table-cell",
-                        },
-                      }}
-                    >
-                      {engine.fuel_type || "—"}
-                    </TableCell>
-
-                    <TableCell align="right">
+                    <TableCell align="right" sx={stickyActionCellSx}>
                       {(canWrite || canDelete) && (
                         <Tooltip title="Engine actions">
                                                 <IconButton
@@ -941,7 +881,7 @@ export default function Engines() {
                 {!visibleEngines.length && (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={5}
                       align="center"
                       sx={{ py: 5 }}
                     >
