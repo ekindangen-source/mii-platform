@@ -293,7 +293,7 @@ function sendError(res, error) {
 
 async function ensureCustomer(client, customerId) {
   const result = await client.query(
-    `SELECT customer_id
+    `SELECT customer_id, assigned_to
      FROM customers
      WHERE customer_id = $1`,
     [customerId]
@@ -304,6 +304,8 @@ async function ensureCustomer(client, customerId) {
     error.status = 404;
     throw error;
   }
+
+  return result.rows[0];
 }
 
 async function validateContact(
@@ -490,7 +492,7 @@ router.post(
       validateNextAction(nextAction, nextActionAt);
 
       await client.query("BEGIN");
-      await ensureCustomer(client, customerId);
+      const customer = await ensureCustomer(client, customerId);
       const contactId = await validateContact(
         client,
         customerId,
@@ -541,7 +543,7 @@ router.post(
         contactId,
         nextAction,
         nextActionAt,
-        assignedTo: req.user.userId,
+        assignedTo: customer.assigned_to || req.user.userId,
         updatedBy: req.user.userId,
       });
 
@@ -647,9 +649,10 @@ router.put(
       );
 
       const ownerResult = await client.query(
-        `SELECT created_by
-         FROM customer_interactions
-         WHERE interaction_id = $1`,
+        `SELECT COALESCE(c.assigned_to, ci.created_by) AS assigned_to
+         FROM customer_interactions ci
+         JOIN customers c ON c.customer_id = ci.customer_id
+         WHERE ci.interaction_id = $1`,
         [interactionId]
       );
 
@@ -660,7 +663,7 @@ router.put(
         nextAction,
         nextActionAt,
         assignedTo:
-          ownerResult.rows[0]?.created_by || req.user.userId,
+          ownerResult.rows[0]?.assigned_to || req.user.userId,
         updatedBy: req.user.userId,
       });
 

@@ -28,6 +28,7 @@ import {
 } from "@mui/material";
 
 import AddIcon from "@mui/icons-material/Add";
+import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
@@ -70,12 +71,14 @@ const emptyForm = {
   InitialPICName: "",
   InitialPICTitle: "",
   InitialPICPhone: "",
+  AssignedTo: "",
 };
 
 const sortableColumns = [
   { id: "customer_id", label: "Customer ID" },
   { id: "company", label: "Company" },
   { id: "primary_contact_name", label: "Contact" },
+  { id: "assigned_to_name", label: "Salesperson" },
   { id: "province", label: "Province" },
   { id: "fleet_size", label: "Fleet", numeric: true },
 ];
@@ -102,7 +105,22 @@ function mapRowToForm(row) {
     InitialPICName: "",
     InitialPICTitle: "",
     InitialPICPhone: "",
+    AssignedTo: row.assigned_to || "",
   };
+}
+
+function formatAssignmentTime(value) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(value));
 }
 
 function compareValues(left, right, numeric = false) {
@@ -134,8 +152,10 @@ export default function Customers() {
     user?.role,
     "customers"
   );
+  const canAssign = ["admin", "manager"].includes(user?.role);
 
   const [customers, setCustomers] = useState([]);
+  const [assignees, setAssignees] = useState([]);
   const [search, setSearch] = useState("");
   const [orderBy, setOrderBy] = useState("company");
   const [order, setOrder] = useState("asc");
@@ -171,6 +191,15 @@ export default function Customers() {
   const [interactionsCustomer, setInteractionsCustomer] =
     useState(null);
   const [scheduleCustomer, setScheduleCustomer] = useState(null);
+  const [assignmentTarget, setAssignmentTarget] = useState(null);
+  const [assignmentForm, setAssignmentForm] = useState({
+    AssignedTo: "",
+    Reason: "",
+  });
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [historyCustomer, setHistoryCustomer] = useState(null);
+  const [assignmentHistory, setAssignmentHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   async function loadCustomers() {
     try {
@@ -195,8 +224,22 @@ export default function Customers() {
     }
   }
 
+  async function loadAssignees() {
+    try {
+      const response = await api.get("/customers/assignees");
+      setAssignees(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to load customer assignees"
+      );
+    }
+  }
+
   useEffect(() => {
     loadCustomers();
+    loadAssignees();
   }, []);
 
   useEffect(() => {
@@ -224,6 +267,8 @@ export default function Customers() {
         customer.industry,
         customer.home_port,
         customer.lead_source,
+        customer.assigned_to_name,
+        customer.assigned_to_email,
       ].some((value) =>
         String(value ?? "").toLowerCase().includes(query)
       )
@@ -261,7 +306,10 @@ export default function Customers() {
 
   function openCreateDialog() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      AssignedTo: user?.userId || "",
+    });
     setFormOpen(true);
   }
 
@@ -442,6 +490,70 @@ export default function Customers() {
     closeActionMenu();
   }
 
+  function handleAssignFromMenu() {
+    const customer = actionCustomer;
+    closeActionMenu();
+
+    if (customer) {
+      setAssignmentTarget(customer);
+      setAssignmentForm({
+        AssignedTo: customer.assigned_to || "",
+        Reason: "",
+      });
+    }
+  }
+
+  async function handleHistoryFromMenu() {
+    const customer = actionCustomer;
+    closeActionMenu();
+    if (!customer) return;
+
+    setHistoryCustomer(customer);
+    setHistoryLoading(true);
+    setAssignmentHistory([]);
+
+    try {
+      const response = await api.get(
+        `/customers/${encodeURIComponent(customer.customer_id)}/assignment-history`
+      );
+      setAssignmentHistory(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to load assignment history"
+      );
+      setHistoryCustomer(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function saveAssignment(event) {
+    event.preventDefault();
+    if (!assignmentTarget) return;
+
+    try {
+      setAssignmentSaving(true);
+      setError("");
+      await api.patch(
+        `/customers/${encodeURIComponent(assignmentTarget.customer_id)}/assignment`,
+        assignmentForm
+      );
+      setSuccess("Customer salesperson updated successfully");
+      setAssignmentTarget(null);
+      await loadCustomers();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to update customer salesperson"
+      );
+    } finally {
+      setAssignmentSaving(false);
+    }
+  }
+
   function editSelectedCustomer() {
     if (!selectedCustomer) {
       return;
@@ -491,6 +603,12 @@ export default function Customers() {
             {
               label: "Industry",
               value: selectedCustomer.industry,
+            },
+            {
+              label: "Assigned salesperson",
+              value:
+                selectedCustomer.assigned_to_name ||
+                "Unassigned",
             },
           ],
         },
@@ -582,6 +700,10 @@ export default function Customers() {
         {
           title: "System",
           fields: [
+            {
+              label: "Created by",
+              value: selectedCustomer.created_by_name,
+            },
             {
               label: "Created",
               value: selectedCustomer.created_at,
@@ -745,6 +867,11 @@ export default function Customers() {
                                 xs: "none",
                                 md: "table-cell",
                               }
+                            : column.id === "assigned_to_name"
+                              ? {
+                                  xs: "none",
+                                  md: "table-cell",
+                                }
                             : column.id === "province"
                               ? {
                                   xs: "none",
@@ -852,6 +979,17 @@ export default function Customers() {
                       sx={{
                         display: {
                           xs: "none",
+                          md: "table-cell",
+                        },
+                      }}
+                    >
+                      {customer.assigned_to_name || "Unassigned"}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        display: {
+                          xs: "none",
                           sm: "table-cell",
                         },
                       }}
@@ -903,7 +1041,7 @@ export default function Customers() {
                 {!visibleCustomers.length && (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={9}
                       align="center"
                       sx={{ py: 5 }}
                     >
@@ -962,6 +1100,24 @@ export default function Customers() {
           />
           Contacts / PICs
         </MenuItem>
+
+        <MenuItem onClick={handleHistoryFromMenu}>
+          <HistoryIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Assignment history
+        </MenuItem>
+
+        {canAssign && (
+          <MenuItem onClick={handleAssignFromMenu}>
+            <AssignmentIndIcon
+              fontSize="small"
+              sx={{ mr: 1.25 }}
+            />
+            Assign salesperson
+          </MenuItem>
+        )}
 
         {canWrite && (
           <MenuItem onClick={handleEditFromMenu}>
@@ -1085,6 +1241,26 @@ export default function Customers() {
                   </MenuItem>
                 ))}
               </TextField>
+
+              {!editingId && canAssign && (
+                <TextField
+                  select
+                  label="Assigned salesperson"
+                  name="AssignedTo"
+                  value={form.AssignedTo}
+                  onChange={handleChange}
+                  required
+                >
+                  {assignees.map((assignee) => (
+                    <MenuItem
+                      key={assignee.user_id}
+                      value={assignee.user_id}
+                    >
+                      {assignee.full_name} ({assignee.user_id})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
 
               {[
                 ["Company", "Company", "text"],
@@ -1213,6 +1389,130 @@ export default function Customers() {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(assignmentTarget)}
+        onClose={() => {
+          if (!assignmentSaving) setAssignmentTarget(null);
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <Box component="form" onSubmit={saveAssignment}>
+          <DialogTitle>Assign salesperson</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {assignmentTarget?.company} ({assignmentTarget?.customer_id})
+              </Typography>
+
+              <TextField
+                select
+                label="Assigned salesperson"
+                value={assignmentForm.AssignedTo}
+                onChange={(event) =>
+                  setAssignmentForm((current) => ({
+                    ...current,
+                    AssignedTo: event.target.value,
+                  }))
+                }
+              >
+                <MenuItem value="">
+                  <em>Unassigned</em>
+                </MenuItem>
+                {assignees.map((assignee) => (
+                  <MenuItem
+                    key={assignee.user_id}
+                    value={assignee.user_id}
+                  >
+                    {assignee.full_name} ({assignee.user_id})
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                label="Reason for reassignment"
+                value={assignmentForm.Reason}
+                onChange={(event) =>
+                  setAssignmentForm((current) => ({
+                    ...current,
+                    Reason: event.target.value,
+                  }))
+                }
+                multiline
+                minRows={2}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setAssignmentTarget(null)}
+              disabled={assignmentSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={assignmentSaving}
+            >
+              {assignmentSaving ? "Saving..." : "Save assignment"}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(historyCustomer)}
+        onClose={() => setHistoryCustomer(null)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>Customer assignment history</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {historyCustomer?.company} ({historyCustomer?.customer_id})
+          </Typography>
+
+          {historyLoading ? (
+            <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : assignmentHistory.length ? (
+            <Stack spacing={1.5}>
+              {assignmentHistory.map((entry) => (
+                <Paper
+                  key={entry.assignment_history_id}
+                  variant="outlined"
+                  sx={{ p: 1.5 }}
+                >
+                  <Typography fontWeight={700}>
+                    {entry.previous_assigned_to_name || "Unassigned"}
+                    {" -> "}
+                    {entry.assigned_to_name || "Unassigned"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatAssignmentTime(entry.assigned_at)} by{" "}
+                    {entry.changed_by_name || entry.changed_by || "System"}
+                  </Typography>
+                  {entry.reason && (
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      {entry.reason}
+                    </Typography>
+                  )}
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Typography color="text.secondary">
+              No assignment history is available.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryCustomer(null)}>Close</Button>
+        </DialogActions>
       </Dialog>
 
       <ConfirmDialog

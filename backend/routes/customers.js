@@ -36,6 +36,31 @@ function nullable(value) {
   return value;
 }
 
+function canAssignCustomers(user) {
+  return ["admin", "manager"].includes(user?.role);
+}
+
+async function validateActiveAssignee(client, assignedTo) {
+  if (!assignedTo) {
+    return null;
+  }
+
+  const result = await client.query(
+    `SELECT user_id
+     FROM app_users
+     WHERE user_id = $1 AND is_active = true`,
+    [assignedTo]
+  );
+
+  if (!result.rowCount) {
+    const error = new Error("Assigned user is not active");
+    error.status = 400;
+    throw error;
+  }
+
+  return assignedTo;
+}
+
 // CREATE CUSTOMER ACCOUNT
 router.post(
   "/",
@@ -58,6 +83,19 @@ router.post(
       const initialPicPhone = String(
         r.InitialPICPhone || ""
       ).trim();
+      const requestedAssignee = nullable(r.AssignedTo);
+
+      if (
+        requestedAssignee &&
+        requestedAssignee !== req.user.userId &&
+        !canAssignCustomers(req.user)
+      ) {
+        return res.status(403).json({
+          status: "ERROR",
+          message:
+            "Only administrators and managers can assign a customer to another user",
+        });
+      }
 
       if (!accountType) {
         return res.status(400).json({
@@ -89,6 +127,10 @@ router.post(
       }
 
       await client.query("BEGIN");
+      const assignedTo = await validateActiveAssignee(
+        client,
+        requestedAssignee || req.user.userId
+      );
 
       const result = await client.query(
         `INSERT INTO customers
@@ -109,12 +151,13 @@ router.post(
           address,
           notes,
           lead_source,
-          created_by
+          created_by,
+          assigned_to
         )
         VALUES
         (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,
-          $10,$11,$12,$13,$14,$15,$16,$17
+          $10,$11,$12,$13,$14,$15,$16,$17,$18
         )
         RETURNING *`,
         [
@@ -135,6 +178,25 @@ router.post(
           nullable(r.Notes),
           nullable(r.Source),
           req.user.userId,
+          assignedTo,
+        ]
+      );
+
+      await client.query(
+        `INSERT INTO customer_assignment_history
+         (
+           customer_id,
+           previous_assigned_to,
+           assigned_to,
+           changed_by,
+           reason
+         )
+         VALUES ($1,NULL,$2,$3,$4)`,
+        [
+          result.rows[0].customer_id,
+          assignedTo,
+          req.user.userId,
+          "Customer created",
         ]
       );
 
@@ -189,6 +251,9 @@ router.get(
       const result = await pool.query(
         `SELECT
            c.*,
+           owner.full_name AS assigned_to_name,
+           owner.email AS assigned_to_email,
+           creator.full_name AS created_by_name,
            pc.contact_id AS primary_contact_id,
            pc.full_name AS primary_contact_name,
            pc.job_title AS primary_contact_job_title,
@@ -199,6 +264,10 @@ router.get(
            COALESCE(contact_totals.active_contact_count, 0)::integer
              AS active_contact_count
          FROM customers c
+         LEFT JOIN app_users owner
+           ON owner.user_id = c.assigned_to
+         LEFT JOIN app_users creator
+           ON creator.user_id = c.created_by
          LEFT JOIN LATERAL (
            SELECT
              cc.contact_id,
@@ -235,6 +304,147 @@ router.get(
         status: "ERROR",
         message: err.message,
       });
+    }
+  }
+);
+
+router.get(
+  "/assignees",
+  requireAuth,
+  async (_req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT user_id, full_name, email, role
+         FROM app_users
+         WHERE is_active = true
+           AND role IN ('admin', 'manager', 'sales')
+         ORDER BY full_name, user_id`
+      );
+
+      res.json(result.rows);
+    } catch (err) {
+      res.status(500).json({
+        status: "ERROR",
+        message: err.message,
+      });
+    }
+  }
+);
+
+router.get(
+  "/:id/assignment-history",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT
+           h.assignment_history_id,
+           h.customer_id,
+           h.previous_assigned_to,
+           previous_user.full_name AS previous_assigned_to_name,
+           h.assigned_to,
+           assigned_user.full_name AS assigned_to_name,
+           h.changed_by,
+           changed_user.full_name AS changed_by_name,
+           h.reason,
+           h.assigned_at
+         FROM customer_assignment_history h
+         LEFT JOIN app_users previous_user
+           ON previous_user.user_id = h.previous_assigned_to
+         LEFT JOIN app_users assigned_user
+           ON assigned_user.user_id = h.assigned_to
+         LEFT JOIN app_users changed_user
+           ON changed_user.user_id = h.changed_by
+         WHERE h.customer_id = $1
+         ORDER BY h.assigned_at DESC, h.assignment_history_id DESC`,
+        [req.params.id]
+      );
+
+      res.json(result.rows);
+    } catch (err) {
+      res.status(500).json({
+        status: "ERROR",
+        message: err.message,
+      });
+    }
+  }
+);
+
+router.patch(
+  "/:id/assignment",
+  requireAuth,
+  requireRole("admin", "manager"),
+  async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const assignedTo = nullable(req.body.AssignedTo);
+      const reason = nullable(req.body.Reason);
+
+      await client.query("BEGIN");
+      await validateActiveAssignee(client, assignedTo);
+
+      const current = await client.query(
+        `SELECT customer_id, assigned_to
+         FROM customers
+         WHERE customer_id = $1
+         FOR UPDATE`,
+        [req.params.id]
+      );
+
+      if (!current.rowCount) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          status: "ERROR",
+          message: "Customer not found",
+        });
+      }
+
+      if (current.rows[0].assigned_to === assignedTo) {
+        await client.query("COMMIT");
+        return res.json({
+          status: "OK",
+          message: "Customer assignment is unchanged",
+        });
+      }
+
+      await client.query(
+        `INSERT INTO customer_assignment_history
+         (
+           customer_id,
+           previous_assigned_to,
+           assigned_to,
+           changed_by,
+           reason
+         )
+         VALUES ($1,$2,$3,$4,$5)`,
+        [
+          req.params.id,
+          current.rows[0].assigned_to,
+          assignedTo,
+          req.user.userId,
+          reason,
+        ]
+      );
+
+      const result = await client.query(
+        `UPDATE customers
+         SET assigned_to = $2, updated_at = NOW()
+         WHERE customer_id = $1
+         RETURNING *`,
+        [req.params.id, assignedTo]
+      );
+
+      await client.query("COMMIT");
+      res.json({ status: "OK", customer: result.rows[0] });
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      res.status(Number(err.status) || 500).json({
+        status: "ERROR",
+        message: err.message,
+      });
+    } finally {
+      client.release();
     }
   }
 );
