@@ -72,37 +72,28 @@ function emptyForm() {
   };
 }
 
-function formatDateTime(value) {
+function formatDate(value) {
   if (!value) {
-    return "—";
+    return "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â";
+  }
+
+  const rawValue = String(value);
+  const isoDate = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (isoDate) {
+    return `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return String(value);
+    return rawValue;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
 
-function formatDate(value) {
-  if (!value) {
-    return "—";
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
+  return `${day}/${month}/${date.getFullYear()}`;
 }
 
 function readAsDataUrl(blob) {
@@ -429,7 +420,7 @@ export default function CustomerInteractionsDialog({
       setSuccess(
         editingInteraction
           ? "Interaction updated successfully"
-          : "Interaction added successfully"
+          : "Unscheduled interaction logged successfully"
       );
       setFormOpen(false);
       setEditingInteraction(null);
@@ -529,13 +520,13 @@ export default function CustomerInteractionsDialog({
           >
             <Box>
               <Typography variant="h6" fontWeight={700}>
-                Customer interactions
+                Interaction history
               </Typography>
               <Typography
                 variant="body2"
                 color="text.secondary"
               >
-                {customer?.company || "Customer"} · {customerId}
+                {customer?.company || "Customer"} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {customerId}
               </Typography>
             </Box>
 
@@ -557,7 +548,7 @@ export default function CustomerInteractionsDialog({
                   startIcon={<AddIcon />}
                   onClick={openCreateForm}
                 >
-                  Add interaction
+                  Log unscheduled interaction
                 </Button>
               )}
             </Stack>
@@ -631,7 +622,7 @@ export default function CustomerInteractionsDialog({
                           variant="subtitle2"
                           fontWeight={700}
                         >
-                          {formatDateTime(
+                          {formatDate(
                             interaction.interaction_at
                           )}
                         </Typography>
@@ -650,7 +641,7 @@ export default function CustomerInteractionsDialog({
                       >
                         PIC: {interaction.contact_name || "Not specified"}
                         {interaction.contact_job_title
-                          ? ` · ${interaction.contact_job_title}`
+                          ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${interaction.contact_job_title}`
                           : ""}
                       </Typography>
 
@@ -724,7 +715,7 @@ export default function CustomerInteractionsDialog({
                       <Typography variant="body2">
                         {interaction.next_action || "Follow up"}
                         {interaction.next_action_date
-                          ? ` · ${formatDate(
+                          ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${formatDate(
                               interaction.next_action_date
                             )}`
                           : ""}
@@ -827,7 +818,7 @@ export default function CustomerInteractionsDialog({
                     Recorded by {interaction.created_by_name || "Unknown user"}
                     {interaction.updated_at &&
                     interaction.updated_at !== interaction.created_at
-                      ? ` · Updated ${formatDateTime(
+                      ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Updated ${formatDate(
                           interaction.updated_at
                         )}`
                       : ""}
@@ -845,8 +836,9 @@ export default function CustomerInteractionsDialog({
                 color="text.secondary"
                 sx={{ mt: 0.5 }}
               >
-                Calls, emails, meetings, visits, and follow-ups will
-                appear here in chronological order.
+                Scheduled activities are logged automatically when completed.
+                Use this action only for unscheduled calls, emails, WhatsApp
+                messages, meetings, or visits.
               </Typography>
             </Box>
           )}
@@ -867,7 +859,7 @@ export default function CustomerInteractionsDialog({
           <DialogTitle>
             {editingInteraction
               ? "Edit interaction"
-              : "Add interaction"}
+              : "Log unscheduled interaction"}
           </DialogTitle>
 
           <DialogContent dividers>
@@ -926,7 +918,7 @@ export default function CustomerInteractionsDialog({
                   >
                     {contact.full_name}
                     {contact.job_title
-                      ? ` — ${contact.job_title}`
+                      ? ` ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ${contact.job_title}`
                       : ""}
                     {!contact.is_active ? " (Inactive)" : ""}
                   </MenuItem>

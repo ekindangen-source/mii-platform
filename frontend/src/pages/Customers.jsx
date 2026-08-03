@@ -817,7 +817,7 @@ export default function Customers() {
                         variant="caption"
                         color="text.secondary"
                       >
-                        {customer.industry || "—"}
+                        {customer.industry || "Ã¢â‚¬â€"}
                       </Typography>
                     </TableCell>
 
@@ -831,7 +831,7 @@ export default function Customers() {
                     >
                       {customer.primary_contact_name ||
                         customer.contact_person ||
-                        "—"}
+                        "Ã¢â‚¬â€"}
                     </TableCell>
 
                     <TableCell
@@ -842,11 +842,11 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.province || "—"}
+                      {customer.province || "Ã¢â‚¬â€"}
                     </TableCell>
 
                     <TableCell align="right">
-                      {customer.fleet_size ?? "—"}
+                      {customer.fleet_size ?? "Ã¢â‚¬â€"}
                     </TableCell>
 
                     <TableCell
@@ -859,7 +859,7 @@ export default function Customers() {
                     >
                       {customer.primary_contact_telephone ||
                         customer.telephone ||
-                        "—"}
+                        "Ã¢â‚¬â€"}
                     </TableCell>
 
                     <TableCell
@@ -872,7 +872,7 @@ export default function Customers() {
                     >
                       {customer.primary_contact_email ||
                         customer.email ||
-                        "—"}
+                        "Ã¢â‚¬â€"}
                     </TableCell>
 
                     <TableCell align="right">
@@ -936,14 +936,14 @@ export default function Customers() {
             fontSize="small"
             sx={{ mr: 1.25 }}
           />
-          Interactions
+          Log unscheduled interaction
         </MenuItem>
         <MenuItem onClick={handleScheduleFromMenu}>
           <EventAvailableIcon
             fontSize="small"
             sx={{ mr: 1.25 }}
           />
-          Meetings & Visits
+          Schedule meeting / visit
         </MenuItem>
         <MenuItem onClick={handleContactsFromMenu}>
           <PeopleAltIcon

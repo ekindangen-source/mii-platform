@@ -60,3 +60,10 @@ VITE_API_BASE_URL=/api
 ## Follow-up creation on completion
 
 When a scheduled activity is completed and a Next action date is supplied, MII automatically creates a new planned Follow-up activity in Agenda. It keeps the same customer, PIC, assigned user, and local time of day as the completed activity. The next-action text becomes the follow-up purpose.
+## Planned and unscheduled customer activity workflow
+
+- Use **Schedule meeting / visit** for future meetings, visits, scheduled calls, and follow-ups.
+- Complete the Agenda activity after it occurs. MII automatically creates the Customer Interaction.
+- Use **Log unscheduled interaction** only for unplanned calls, emails, WhatsApp messages, walk-in visits, or informal discussions.
+- Do not manually log a second interaction for an activity completed through Agenda.
+- When a completed activity includes a dated next action, MII creates a new planned Follow-up in Agenda.

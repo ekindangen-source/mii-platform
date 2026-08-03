@@ -158,7 +158,7 @@ export default function CompleteScheduledActivityDialog({
             Cancel
           </Button>
           <Button type="submit" variant="contained" disabled={saving}>
-            {saving ? "Completing..." : "Complete and create interaction"}
+            {saving ? "Completing..." : "Complete and log interaction"}
           </Button>
         </DialogActions>
       </Box>

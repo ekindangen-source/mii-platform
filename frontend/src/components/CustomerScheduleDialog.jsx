@@ -137,7 +137,7 @@ export default function CustomerScheduleDialog({
                 Meetings & Visits
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {customer?.company} · {customer?.customer_id}
+                {customer?.company} Ã‚Â· {customer?.customer_id}
               </Typography>
             </Box>
             {canWrite && (
@@ -146,7 +146,7 @@ export default function CustomerScheduleDialog({
                 startIcon={<AddIcon />}
                 onClick={openCreate}
               >
-                Schedule
+                Schedule meeting / visit
               </Button>
             )}
           </Stack>
@@ -223,7 +223,7 @@ export default function CustomerScheduleDialog({
 
                     <Stack direction="row" spacing={0.5} alignItems="flex-start">
                       {canWrite && OPEN_ACTIVITY_STATUSES.has(activity.status) && (
-                        <Tooltip title="Complete and create interaction">
+                        <Tooltip title="Complete and log interaction">
                           <IconButton
                             color="success"
                             onClick={() => setCompleting(activity)}
