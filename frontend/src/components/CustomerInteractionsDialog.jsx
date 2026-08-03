@@ -68,7 +68,7 @@ function emptyForm() {
     Participants: "",
     Notes: "",
     NextAction: "",
-    NextActionDate: "",
+    NextActionAt: "",
   };
 }
 
@@ -94,6 +94,26 @@ function formatDate(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
 
   return `${day}/${month}/${date.getFullYear()}`;
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  const pad = (number) => String(number).padStart(2, "0");
+
+  return (
+    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/` +
+    `${date.getFullYear()} ${pad(date.getHours())}:` +
+    `${pad(date.getMinutes())}`
+  );
 }
 
 function readAsDataUrl(blob) {
@@ -210,8 +230,15 @@ function mapInteractionToForm(interaction) {
     ContactID: interaction.contact_id || "",
     Participants: interaction.participants || "",
     Notes: interaction.notes || "",
-    NextAction: interaction.next_action || "",
-    NextActionDate: interaction.next_action_date || "",
+    NextAction:
+      interaction.next_action_scheduled_purpose ||
+      interaction.next_action ||
+      "",
+    NextActionAt: localDateTimeInput(
+      interaction.next_action_scheduled_at ||
+        interaction.next_action_at ||
+        interaction.next_action_date
+    ),
   };
 }
 
@@ -376,6 +403,13 @@ export default function CustomerInteractionsDialog({
       return;
     }
 
+    if (Boolean(form.NextAction.trim()) !== Boolean(form.NextActionAt)) {
+      setError(
+        "Next action and next action date and time must both be provided"
+      );
+      return;
+    }
+
     let interactionSaved = false;
 
     try {
@@ -388,6 +422,9 @@ export default function CustomerInteractionsDialog({
         InteractionAt: new Date(
           form.InteractionAt
         ).toISOString(),
+        NextActionAt: form.NextActionAt
+          ? new Date(form.NextActionAt).toISOString()
+          : null,
       };
       let interactionId =
         editingInteraction?.interaction_id;
@@ -689,7 +726,9 @@ export default function CustomerInteractionsDialog({
                   </Typography>
 
                   {(interaction.next_action ||
-                    interaction.next_action_date) && (
+                    interaction.next_action_scheduled_purpose ||
+                    interaction.next_action_at ||
+                    interaction.next_action_scheduled_at) && (
                     <Box
                       sx={{
                         mt: 1.5,
@@ -706,11 +745,18 @@ export default function CustomerInteractionsDialog({
                         NEXT ACTION
                       </Typography>
                       <Typography variant="body2">
-                        {interaction.next_action || "Follow up"}
-                        {interaction.next_action_date
-                          ? ` - ${formatDate(
-                              interaction.next_action_date
+                        {interaction.next_action_scheduled_purpose ||
+                          interaction.next_action ||
+                          "Follow up"}
+                        {(interaction.next_action_scheduled_at ||
+                          interaction.next_action_at)
+                          ? ` - ${formatDateTime(
+                              interaction.next_action_scheduled_at ||
+                                interaction.next_action_at
                             )}`
+                          : ""}
+                        {interaction.next_action_activity_id
+                          ? ` - Agenda ${interaction.next_action_activity_id}`
                           : ""}
                       </Typography>
                     </Box>
@@ -946,10 +992,10 @@ export default function CustomerInteractionsDialog({
               />
 
               <TextField
-                label="Next action date"
-                name="NextActionDate"
-                type="date"
-                value={form.NextActionDate}
+                label="Next action date and time"
+                name="NextActionAt"
+                type="datetime-local"
+                value={form.NextActionAt}
                 onChange={handleChange}
                 slotProps={{
                   inputLabel: { shrink: true },
