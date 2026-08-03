@@ -19,6 +19,7 @@ import Vessels from "./pages/Vessels";
 import Engines from "./pages/Engines";
 import Trips from "./pages/Trips";
 import Maintenance from "./pages/Maintenance";
+import Agenda from "./pages/Agenda";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 
@@ -79,6 +80,10 @@ function AppRoutes() {
         <Route
           path="/maintenance"
           element={<Maintenance />}
+        />
+        <Route
+          path="/agenda"
+          element={<Agenda />}
         />
         <Route
           path="/users"

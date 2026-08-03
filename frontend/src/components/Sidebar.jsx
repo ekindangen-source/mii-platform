@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 
 import BuildIcon from "@mui/icons-material/Build";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
 import EngineeringIcon from "@mui/icons-material/Engineering";
@@ -22,6 +23,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import { NavLink } from "react-router-dom";
 
 import {
+  APP_RELEASE_NAME,
   APP_VERSION_LABEL,
 } from "../config/appVersion";
 import { useAuth } from "../context/AuthContext";
@@ -60,6 +62,11 @@ const navigationGroups = [
   {
     label: "Operations",
     items: [
+      {
+        label: "Agenda",
+        path: "/agenda",
+        icon: <CalendarMonthIcon />,
+      },
       {
         label: "Trips",
         path: "/trips",
@@ -330,7 +337,19 @@ export default function Sidebar({ onNavigate }) {
             fontWeight: 700,
           }}
         >
-          {APP_VERSION_LABEL}
+          MII Platform {APP_VERSION_LABEL}
+        </Typography>
+
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            mt: 0.25,
+            color: "rgba(255,255,255,0.34)",
+            fontSize: 10,
+          }}
+        >
+          {APP_RELEASE_NAME}
         </Typography>
       </Box>
     </Box>

@@ -30,6 +30,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import HistoryIcon from "@mui/icons-material/History";
@@ -41,6 +42,7 @@ import useMasterData from "../hooks/useMasterData";
 import ConfirmDialog from "../components/ConfirmDialog";
 import CustomerContactsDialog from "../components/CustomerContactsDialog";
 import CustomerInteractionsDialog from "../components/CustomerInteractionsDialog";
+import CustomerScheduleDialog from "../components/CustomerScheduleDialog";
 import RecordDetailsDialog from "../components/RecordDetailsDialog";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -162,6 +164,7 @@ export default function Customers() {
   const [contactsCustomer, setContactsCustomer] = useState(null);
   const [interactionsCustomer, setInteractionsCustomer] =
     useState(null);
+  const [scheduleCustomer, setScheduleCustomer] = useState(null);
 
   async function loadCustomers() {
     try {
@@ -384,6 +387,16 @@ export default function Customers() {
     if (customer) {
       setSelectedCustomer(null);
       setInteractionsCustomer(customer);
+    }
+  }
+
+  function handleScheduleFromMenu() {
+    const customer = actionCustomer;
+    closeActionMenu();
+
+    if (customer) {
+      setSelectedCustomer(null);
+      setScheduleCustomer(customer);
     }
   }
 
@@ -804,7 +817,7 @@ export default function Customers() {
                         variant="caption"
                         color="text.secondary"
                       >
-                        {customer.industry || "—"}
+                        {customer.industry || "-"}
                       </Typography>
                     </TableCell>
 
@@ -816,9 +829,7 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_name ||
-                        customer.contact_person ||
-                        "—"}
+                      {customer.primary_contact_name || customer.contact_person || "-"}
                     </TableCell>
 
                     <TableCell
@@ -829,11 +840,11 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.province || "—"}
+                      {customer.province || "-"}
                     </TableCell>
 
                     <TableCell align="right">
-                      {customer.fleet_size ?? "—"}
+                      {customer.fleet_size ?? "-"}
                     </TableCell>
 
                     <TableCell
@@ -844,9 +855,7 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_telephone ||
-                        customer.telephone ||
-                        "—"}
+                      {customer.primary_contact_telephone || customer.telephone || "-"}
                     </TableCell>
 
                     <TableCell
@@ -857,9 +866,7 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_email ||
-                        customer.email ||
-                        "—"}
+                      {customer.primary_contact_email || customer.email || "-"}
                     </TableCell>
 
                     <TableCell align="right">
@@ -923,7 +930,14 @@ export default function Customers() {
             fontSize="small"
             sx={{ mr: 1.25 }}
           />
-          Interactions
+          Log unscheduled interaction
+        </MenuItem>
+        <MenuItem onClick={handleScheduleFromMenu}>
+          <EventAvailableIcon
+            fontSize="small"
+            sx={{ mr: 1.25 }}
+          />
+          Schedule meeting / visit
         </MenuItem>
         <MenuItem onClick={handleContactsFromMenu}>
           <PeopleAltIcon
@@ -978,6 +992,13 @@ export default function Customers() {
         canWrite={canWrite}
         canDelete={canDelete}
         onClose={() => setInteractionsCustomer(null)}
+      />
+      <CustomerScheduleDialog
+        open={Boolean(scheduleCustomer)}
+        customer={scheduleCustomer}
+        canWrite={canWrite}
+        canDelete={canDelete}
+        onClose={() => setScheduleCustomer(null)}
       />
       <CustomerContactsDialog
         open={Boolean(contactsCustomer)}

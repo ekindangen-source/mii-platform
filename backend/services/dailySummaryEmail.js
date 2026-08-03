@@ -326,6 +326,89 @@ const queries = {
       i.interaction_at,
       i.interaction_id
   `,
+  scheduledToday: `
+    SELECT
+      sa.activity_id,
+      sa.customer_id,
+      c.company AS customer_name,
+      sa.contact_id,
+      cc.full_name AS contact_name,
+      sa.assigned_to,
+      COALESCE(
+        au.full_name,
+        'Legacy / Unknown'
+      ) AS assigned_to_name,
+      sa.activity_type,
+      sa.scheduled_start,
+      sa.scheduled_end,
+      sa.location,
+      sa.purpose,
+      sa.notes,
+      sa.reminder_at,
+      sa.status,
+      sa.completed_interaction_id
+    FROM scheduled_activities sa
+    INNER JOIN customers c
+      ON c.customer_id = sa.customer_id
+    LEFT JOIN customer_contacts cc
+      ON cc.customer_id = sa.customer_id
+      AND cc.contact_id = sa.contact_id
+    LEFT JOIN app_users au
+      ON au.user_id = sa.assigned_to
+    WHERE
+      sa.scheduled_start >= (
+        ($1::date)::timestamp
+        AT TIME ZONE $2
+      )
+      AND sa.scheduled_start < (
+        (($1::date + 1)::date)::timestamp
+        AT TIME ZONE $2
+      )
+    ORDER BY
+      COALESCE(au.full_name, 'Legacy / Unknown'),
+      sa.scheduled_start,
+      sa.activity_id
+  `,
+  scheduledOverdue: `
+    SELECT
+      sa.activity_id,
+      sa.customer_id,
+      c.company AS customer_name,
+      sa.contact_id,
+      cc.full_name AS contact_name,
+      sa.assigned_to,
+      COALESCE(
+        au.full_name,
+        'Legacy / Unknown'
+      ) AS assigned_to_name,
+      sa.activity_type,
+      sa.scheduled_start,
+      sa.scheduled_end,
+      sa.location,
+      sa.purpose,
+      sa.notes,
+      sa.reminder_at,
+      sa.status,
+      sa.completed_interaction_id
+    FROM scheduled_activities sa
+    INNER JOIN customers c
+      ON c.customer_id = sa.customer_id
+    LEFT JOIN customer_contacts cc
+      ON cc.customer_id = sa.customer_id
+      AND cc.contact_id = sa.contact_id
+    LEFT JOIN app_users au
+      ON au.user_id = sa.assigned_to
+    WHERE
+      sa.status IN ('planned', 'confirmed')
+      AND sa.scheduled_start < (
+        ($1::date)::timestamp
+        AT TIME ZONE $2
+      )
+    ORDER BY
+      COALESCE(au.full_name, 'Legacy / Unknown'),
+      sa.scheduled_start,
+      sa.activity_id
+  `,
 };
 
 async function loadDailySummary({
@@ -344,6 +427,8 @@ async function loadDailySummary({
     trips,
     maintenance,
     interactions,
+    scheduledToday,
+    scheduledOverdue,
   ] = await Promise.all([
     pool.query(
       queries.customers,
@@ -369,6 +454,14 @@ async function loadDailySummary({
       queries.interactions,
       parameters
     ),
+    pool.query(
+      queries.scheduledToday,
+      parameters
+    ),
+    pool.query(
+      queries.scheduledOverdue,
+      parameters
+    ),
   ]);
 
   return {
@@ -378,6 +471,8 @@ async function loadDailySummary({
     trips: trips.rows,
     maintenance: maintenance.rows,
     interactions: interactions.rows,
+    scheduledToday: scheduledToday.rows,
+    scheduledOverdue: scheduledOverdue.rows,
   };
 }
 
@@ -817,6 +912,160 @@ function renderInteractionGroupsText(
   return lines.join("\n");
 }
 
+function formatScheduledActivityType(value) {
+  const labels = {
+    meeting: "Meeting",
+    visit: "Visit",
+    call: "Call",
+    follow_up: "Follow-up",
+  };
+
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return labels[key] || displayValue(value);
+}
+
+function formatScheduledActivityStatus(value) {
+  const labels = {
+    planned: "Planned",
+    confirmed: "Confirmed",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    rescheduled: "Rescheduled",
+    no_show: "No show",
+  };
+
+  const key = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return labels[key] || displayValue(value);
+}
+
+function summarizeScheduledByUser(rows) {
+  const grouped = new Map();
+
+  rows.forEach((row) => {
+    const key = row.assigned_to || "legacy-unknown";
+    const name =
+      row.assigned_to_name || "Legacy / Unknown";
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        userId: row.assigned_to || null,
+        name,
+        rows: [],
+      });
+    }
+
+    grouped.get(key).rows.push(row);
+  });
+
+  return [...grouped.values()].sort(
+    (left, right) =>
+      right.rows.length - left.rows.length ||
+      left.name.localeCompare(right.name)
+  );
+}
+
+function renderScheduledGroupsHtml({
+  title,
+  rows,
+  timeZone,
+}) {
+  const groups = summarizeScheduledByUser(rows);
+
+  if (!groups.length) {
+    return renderHtmlTable({
+      title,
+      rows: [],
+      timeZone,
+      columns: [
+        { key: "scheduled_time", label: "Time" },
+        { key: "activity_type_label", label: "Type" },
+        { key: "customer_name", label: "Customer" },
+        { key: "purpose", label: "Purpose" },
+        { key: "status_label", label: "Status" },
+      ],
+    });
+  }
+
+  return groups
+    .map((group) =>
+      renderHtmlTable({
+        title: `${title} — ${group.name}`,
+        rows: group.rows.map((row) => ({
+          ...row,
+          scheduled_time: formatTime(
+            row.scheduled_start,
+            timeZone
+          ),
+          activity_type_label:
+            formatScheduledActivityType(
+              row.activity_type
+            ),
+          status_label:
+            formatScheduledActivityStatus(row.status),
+          contact_name: row.contact_name || "—",
+          location: compactText(row.location) || "—",
+          purpose: compactText(row.purpose),
+        })),
+        timeZone,
+        columns: [
+          { key: "scheduled_time", label: "Time" },
+          { key: "activity_type_label", label: "Type" },
+          { key: "customer_name", label: "Customer" },
+          { key: "contact_name", label: "PIC" },
+          { key: "location", label: "Location" },
+          { key: "purpose", label: "Purpose" },
+          { key: "status_label", label: "Status" },
+        ],
+      })
+    )
+    .join("");
+}
+
+function renderScheduledGroupsText(
+  title,
+  rows,
+  timeZone
+) {
+  const groups = summarizeScheduledByUser(rows);
+
+  if (!groups.length) {
+    return [title, "- No scheduled activities.", ""].join("\n");
+  }
+
+  const lines = [title];
+
+  groups.forEach((group) => {
+    lines.push(`${group.name} (${group.rows.length})`);
+
+    group.rows.forEach((row) => {
+      lines.push(
+        `- ${[
+          formatTime(row.scheduled_start, timeZone),
+          formatScheduledActivityType(row.activity_type),
+          row.customer_name,
+          row.contact_name ? `PIC: ${row.contact_name}` : null,
+          compactText(row.location)
+            ? `Location: ${compactText(row.location)}`
+            : null,
+          compactText(row.purpose),
+          formatScheduledActivityStatus(row.status),
+        ]
+          .filter(Boolean)
+          .join(" · ")}`
+      );
+    });
+  });
+
+  lines.push("");
+  return lines.join("\n");
+}
+
 function renderHtmlTable({
   title,
   rows,
@@ -941,7 +1190,8 @@ function renderSummaryHtml({
     data.engines.length +
     data.trips.length +
     data.maintenance.length +
-    data.interactions.length;
+    data.interactions.length +
+    data.scheduledToday.length;
 
   const cards = [
     ["Customers", data.customers.length],
@@ -953,11 +1203,13 @@ function renderSummaryHtml({
       data.maintenance.length,
     ],
     ["Interactions", data.interactions.length],
+    ["Scheduled", data.scheduledToday.length],
+    ["Overdue", data.scheduledOverdue.length],
   ]
     .map(
       ([label, count]) => `
         <td style="
-          width:16.66%;
+          width:12.5%;
           padding:10px;
           text-align:center;
           background:#eef4f8;
@@ -1046,6 +1298,18 @@ function renderSummaryHtml({
 
             ${renderInteractionGroupsHtml({
               rows: data.interactions,
+              timeZone,
+            })}
+
+            ${renderScheduledGroupsHtml({
+              title: "Today's Agenda",
+              rows: data.scheduledToday,
+              timeZone,
+            })}
+
+            ${renderScheduledGroupsHtml({
+              title: "Overdue Scheduled Activities",
+              rows: data.scheduledOverdue,
               timeZone,
             })}
 
@@ -1228,6 +1492,8 @@ function renderSummaryHtml({
               Legacy / Unknown. Customer interactions
               are grouped by the user who logged them
               and are selected by interaction date/time.
+              Today's agenda and overdue activities are
+              grouped by the assigned user.
             </p>
           </div>
         </div>
@@ -1266,6 +1532,16 @@ function renderSummaryText({
     ),
     renderInteractionGroupsText(
       data.interactions,
+      timeZone
+    ),
+    renderScheduledGroupsText(
+      "Today's Agenda by User",
+      data.scheduledToday,
+      timeZone
+    ),
+    renderScheduledGroupsText(
+      "Overdue Scheduled Activities by User",
+      data.scheduledOverdue,
       timeZone
     ),
     renderTextSection({
@@ -1366,7 +1642,8 @@ async function sendDailySummaryEmail({
     data.engines.length +
     data.trips.length +
     data.maintenance.length +
-    data.interactions.length;
+    data.interactions.length +
+    data.scheduledToday.length;
 
   const transporter = createTransporter();
 
@@ -1401,6 +1678,10 @@ async function sendDailySummaryEmail({
         data.maintenance.length,
       interactions:
         data.interactions.length,
+      scheduledToday:
+        data.scheduledToday.length,
+      scheduledOverdue:
+        data.scheduledOverdue.length,
     },
   };
 }
@@ -1411,8 +1692,10 @@ module.exports = {
   getEmailConfig,
   validateEmailConfig,
   verifyEmailTransport,
+  createTransporter,
   loadDailySummary,
   summarizeCustomersByUser,
   summarizeInteractionsByUser,
+  summarizeScheduledByUser,
   sendDailySummaryEmail,
 };

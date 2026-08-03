@@ -9,6 +9,9 @@ const { requireAuth } = require("./middleware/auth");
 const {
   startDailySummaryJob,
 } = require("./jobs/dailySummaryJob");
+const {
+  startScheduledActivityReminderJob,
+} = require("./jobs/scheduledActivityReminderJob");
 
 const adminUsersRoutes = require("./routes/adminUsers");
 const invitationsRoutes = require("./routes/invitations");
@@ -104,6 +107,11 @@ app.use(
   require("./routes/customerInteractions.js")
 );
 app.use(
+  "/scheduled-activities",
+  requireAuth,
+  require("./routes/scheduledActivities.js")
+);
+app.use(
   "/customers",
   requireAuth,
   require("./routes/customers.js")
@@ -157,6 +165,7 @@ app.use((err, _req, res, _next) => {
 });
 
 startDailySummaryJob();
+startScheduledActivityReminderJob();
 
 const PORT = Number(process.env.PORT) || 3000;
 
