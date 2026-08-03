@@ -67,6 +67,9 @@ const emptyForm = {
   Telephone: "",
   Address: "",
   Notes: "",
+  InitialPICName: "",
+  InitialPICTitle: "",
+  InitialPICPhone: "",
 };
 
 const sortableColumns = [
@@ -96,6 +99,9 @@ function mapRowToForm(row) {
     Telephone: row.telephone || "",
     Address: row.address || "",
     Notes: row.notes || "",
+    InitialPICName: "",
+    InitialPICTitle: "",
+    InitialPICPhone: "",
   };
 }
 
@@ -289,6 +295,16 @@ export default function Customers() {
 
     if (!form.Company.trim()) {
       setError("Company is required");
+      return;
+    }
+
+    if (!editingId && !form.InitialPICName.trim()) {
+      setError("Initial PIC name is required");
+      return;
+    }
+
+    if (!editingId && !form.InitialPICPhone.trim()) {
+      setError("Initial PIC phone number is required");
       return;
     }
 
@@ -1102,6 +1118,49 @@ export default function Customers() {
                   required={name === "Company"}
                 />
               ))}
+
+              {!editingId && (
+                <>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight={800}
+                    sx={{ gridColumn: { sm: "1 / -1" }, mt: 1 }}
+                  >
+                    Initial primary PIC
+                  </Typography>
+
+                  <TextField
+                    label="PIC name"
+                    name="InitialPICName"
+                    value={form.InitialPICName}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <TextField
+                    label="Title / position"
+                    name="InitialPICTitle"
+                    value={form.InitialPICTitle}
+                    onChange={handleChange}
+                  />
+
+                  <TextField
+                    label="Phone number"
+                    name="InitialPICPhone"
+                    value={form.InitialPICPhone}
+                    onChange={handleChange}
+                    required
+                  />
+
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ alignSelf: "center" }}
+                  >
+                    This PIC will be active and primary. Add future PICs from Contacts / PICs.
+                  </Typography>
+                </>
+              )}
 
               <TextField
                 label="Address"

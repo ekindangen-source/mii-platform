@@ -2,4 +2,4 @@ import packageJson from "../../package.json";
 
 export const APP_VERSION = packageJson.version;
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
-export const APP_RELEASE_NAME = "Next Action Agenda Integration";
+export const APP_RELEASE_NAME = "Agenda & Customer Onboarding Refinement";
