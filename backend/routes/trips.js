@@ -5,12 +5,18 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  customerAccessCondition,
+  ensureTripAccess,
+  ensureVesselAccess,
+} = require("../middleware/customerAccess");
 
 router.get(
   "/",
   requireAuth,
-  async (_req, res) => {
+  async (req, res) => {
   try {
+    const access = customerAccessCondition(req.user, "c", 1);
     const result = await pool.query(
       `SELECT
          t.*,
@@ -21,7 +27,9 @@ router.get(
          ON t.vessel_id = v.vessel_id
        LEFT JOIN customers c
          ON v.customer_id = c.customer_id
-       ORDER BY t.trip_date DESC`
+       WHERE ${access.clause}
+       ORDER BY t.trip_date DESC`,
+      access.parameters
     );
 
     res.json(result.rows);
@@ -40,6 +48,7 @@ router.post(
   async (req, res) => {
   try {
     const r = req.body;
+    await ensureVesselAccess(pool, req.user, r.VesselID);
 
     const result = await pool.query(
       `INSERT INTO trips
@@ -94,6 +103,8 @@ router.put(
   async (req, res) => {
   try {
     const r = req.body;
+    await ensureTripAccess(pool, req.user, req.params.id);
+    await ensureVesselAccess(pool, req.user, r.VesselID);
 
     const result = await pool.query(
       `UPDATE trips

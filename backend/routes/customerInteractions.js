@@ -9,6 +9,10 @@ const {
   requireRole,
 } = require("../middleware/auth");
 const {
+  requireCustomerAccess,
+  ensureCustomerAccess,
+} = require("../middleware/customerAccess");
+const {
   addInteractionPhotoUrl,
   deleteInteractionPhoto,
   uploadInteractionPhoto,
@@ -27,6 +31,8 @@ const PHOTO_TYPES = new Map([
   ["image/png", ".png"],
   ["image/webp", ".webp"],
 ]);
+
+router.use(requireAuth, requireCustomerAccess());
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const MAX_PHOTOS_PER_INTERACTION = 10;
 
@@ -291,23 +297,6 @@ function sendError(res, error) {
   });
 }
 
-async function ensureCustomer(client, customerId) {
-  const result = await client.query(
-    `SELECT customer_id, assigned_to
-     FROM customers
-     WHERE customer_id = $1`,
-    [customerId]
-  );
-
-  if (result.rowCount === 0) {
-    const error = new Error("Customer not found");
-    error.status = 404;
-    throw error;
-  }
-
-  return result.rows[0];
-}
-
 async function validateContact(
   client,
   customerId,
@@ -449,7 +438,11 @@ async function loadOneInteraction(
 // LIST CUSTOMER INTERACTIONS IN REVERSE CHRONOLOGICAL ORDER
 router.get("/", requireAuth, async (req, res) => {
   try {
-    await ensureCustomer(pool, req.params.customerId);
+    await ensureCustomerAccess(
+      pool,
+      req.user,
+      req.params.customerId
+    );
     return res.json(
       await loadInteractions(req.params.customerId)
     );
@@ -492,7 +485,11 @@ router.post(
       validateNextAction(nextAction, nextActionAt);
 
       await client.query("BEGIN");
-      const customer = await ensureCustomer(client, customerId);
+      const customer = await ensureCustomerAccess(
+        client,
+        req.user,
+        customerId
+      );
       const contactId = await validateContact(
         client,
         customerId,

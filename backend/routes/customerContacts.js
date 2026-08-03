@@ -7,6 +7,11 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  requireCustomerAccess,
+} = require("../middleware/customerAccess");
+
+router.use(requireAuth, requireCustomerAccess());
 
 function nullable(value) {
   if (value === undefined || value === null) {

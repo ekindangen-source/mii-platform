@@ -9,6 +9,11 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  customerAccessCondition,
+  ensureCustomerAccess,
+  ensureVesselAccess,
+} = require("../middleware/customerAccess");
 
 const {
   addPhotoUrl,
@@ -154,6 +159,7 @@ router.post(
   async (req, res) => {
     try {
       const r = req.body;
+      await ensureCustomerAccess(pool, req.user, r.CustomerID);
 
       const result = await pool.query(
         `INSERT INTO vessels
@@ -208,8 +214,9 @@ router.post(
 router.get(
   "/",
   requireAuth,
-  async (_req, res) => {
+  async (req, res) => {
     try {
+      const access = customerAccessCondition(req.user, "c", 1);
       const result = await pool.query(
         `SELECT
            v.*,
@@ -217,8 +224,10 @@ router.get(
          FROM vessels v
          LEFT JOIN customers c
            ON v.customer_id=c.customer_id
+         WHERE ${access.clause}
          ORDER BY v.created_at DESC
-         LIMIT 100`
+         LIMIT 100`,
+        access.parameters
       );
 
       const rows = await Promise.all(
@@ -242,6 +251,8 @@ router.put(
   async (req, res) => {
     try {
       const r = req.body;
+      await ensureVesselAccess(pool, req.user, req.params.id);
+      await ensureCustomerAccess(pool, req.user, r.CustomerID);
 
       const result = await pool.query(
         `UPDATE vessels
@@ -308,6 +319,7 @@ router.put(
     let newObjectKey = null;
 
     try {
+      await ensureVesselAccess(pool, req.user, req.params.id);
       const currentResult =
         await pool.query(
           `SELECT vessel_id, photo_path
@@ -383,6 +395,7 @@ router.delete(
   requireRole("admin", "manager", "sales"),
   async (req, res) => {
     try {
+      await ensureVesselAccess(pool, req.user, req.params.id);
       const result = await pool.query(
         `WITH previous AS (
            SELECT photo_path
