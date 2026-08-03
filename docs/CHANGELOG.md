@@ -1,6 +1,23 @@
 # MII Platform Changelog
 
-## [1.4.1] — In Progress
+## [1.5.0] — In Progress
+
+### Added
+- Meeting, customer visit, scheduled call, and follow-up planning linked to customers and optional PICs.
+- User assignment, start/end time, location, purpose, notes, status, and email reminder time.
+- Role-aware Agenda page with Overdue, Selected Day, and Upcoming 7 Days sections.
+- Customer-level Meetings & Visits workspace.
+- Completion workflow that creates a customer interaction in the same database transaction.
+- Individual scheduled-activity reminder emails with retry and duplicate-send protection.
+- Daily activity email sections for today's agenda and overdue activities grouped by assigned user.
+- Database and daily-summary verification scripts.
+
+### Database
+- Added `scheduled_activities` with generated `ACT-000000` references.
+- Added customer, PIC, assignee, interaction, creator, and updater relationships.
+- Added indexes for agenda queries, customer history, status tracking, and due reminders.
+
+## [1.4.1] — 2026-08-02
 
 ### Added
 - Daily activity email now includes customer interactions grouped by the user who logged them.

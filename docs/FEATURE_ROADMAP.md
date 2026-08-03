@@ -21,8 +21,8 @@ The visible application version is read from `frontend/package.json`.
 | v1.2.2 | Released | Customer Attribution | Capture customer creator and group new customers by user in daily email |
 | v1.3.0 | Released | Customer Account Foundation | Organization/individual accounts and multiple PIC/contact records |
 | v1.4.0 | Released | Customer Interactions | Timeline, meeting notes, photos, next actions, and follow-ups |
-| v1.4.1 | In Progress | Daily Interaction Activity | Customer interactions grouped by user in the daily email |
-| v1.5.0 | Planned | Meeting & Visit Scheduling | Meetings, visits, reminders, and visit-to-interaction conversion |
+| v1.4.1 | Released | Daily Interaction Activity | Customer interactions grouped by user in the daily email |
+| v1.5.0 | In Progress | Meeting & Visit Scheduling | Agenda, assignments, reminders, overdue activities, and interaction conversion |
 | v1.6.0 | Planned | Contact Cadence | Last-contact tracking and prioritized user reminder emails |
 | v1.7.0 | Planned | Full Audit Attribution | `created_by` and `updated_by` for all operational modules |
 | v1.8.0 | Planned — Last Priority | Bulk Data Import | Validated customer, vessel, and engine import with dry run |
