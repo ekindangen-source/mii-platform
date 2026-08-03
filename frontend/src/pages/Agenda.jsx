@@ -21,6 +21,10 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import {
+  dateInputToIsoDate,
+  formatDateInput,
+} from "../utils/dateTime";
 import CompleteScheduledActivityDialog from "../components/CompleteScheduledActivityDialog";
 import {
   OPEN_ACTIVITY_STATUSES,
@@ -31,10 +35,7 @@ import {
 } from "../utils/scheduledActivities";
 
 function localDateValue(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return formatDateInput(date);
 }
 
 function ActivityCard({ activity, canWrite, onComplete }) {
@@ -185,9 +186,17 @@ export default function Agenda() {
     try {
       setLoading(true);
       setError("");
+      const reportDate = dateInputToIsoDate(date);
+
+      if (!reportDate) {
+        setError("Agenda date must use DD/MM/YYYY");
+        setLoading(false);
+        return;
+      }
+
       const response = await api.get("/scheduled-activities/agenda", {
         params: {
-          date,
+          date: reportDate,
           timeZone: "Asia/Jakarta",
           ...(canViewAll ? { assignedTo } : {}),
         },
@@ -238,12 +247,12 @@ export default function Agenda() {
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
           <TextField
-            type="date"
             size="small"
             label="Agenda date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
+            placeholder="DD/MM/YYYY"
+            helperText="Format: DD/MM/YYYY"
           />
           {canViewAll && (
             <TextField

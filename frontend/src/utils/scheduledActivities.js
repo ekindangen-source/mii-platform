@@ -28,14 +28,7 @@ export function formatActivityStatus(value) {
 }
 
 export function formatActivityDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTimeDisplay(value);
 }
 
 export function statusColor(status) {
@@ -50,3 +43,4 @@ export function statusColor(status) {
 
   return colors[status] || "default";
 }
+import { formatDateTimeDisplay } from "./dateTime";

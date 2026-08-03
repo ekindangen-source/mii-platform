@@ -25,6 +25,11 @@ import ImageIcon from "@mui/icons-material/Image";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
 import api from "../services/api";
+import {
+  dateTimeInputToIso,
+  formatDateTimeDisplay,
+  formatDateTimeInput,
+} from "../utils/dateTime";
 import ConfirmDialog from "./ConfirmDialog";
 
 const INTERACTION_TYPES = [
@@ -44,26 +49,10 @@ const ACCEPTED_PHOTO_TYPES = new Set([
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const MAX_NEW_PHOTOS = 5;
 
-function localDateTimeInput(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (number) => String(number).padStart(2, "0");
-
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-` +
-    `${pad(date.getDate())}T${pad(date.getHours())}:` +
-    `${pad(date.getMinutes())}`
-  );
-}
-
 function emptyForm() {
   return {
     InteractionType: "call",
-    InteractionAt: localDateTimeInput(),
+    InteractionAt: formatDateTimeInput(),
     ContactID: "",
     Participants: "",
     Notes: "",
@@ -94,26 +83,6 @@ function formatDate(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
 
   return `${day}/${month}/${date.getFullYear()}`;
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-
-  const pad = (number) => String(number).padStart(2, "0");
-
-  return (
-    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/` +
-    `${date.getFullYear()} ${pad(date.getHours())}:` +
-    `${pad(date.getMinutes())}`
-  );
 }
 
 function readAsDataUrl(blob) {
@@ -224,7 +193,7 @@ async function preparePhoto(file) {
 function mapInteractionToForm(interaction) {
   return {
     InteractionType: interaction.interaction_type || "other",
-    InteractionAt: localDateTimeInput(
+    InteractionAt: formatDateTimeInput(
       interaction.interaction_at
     ),
     ContactID: interaction.contact_id || "",
@@ -234,7 +203,7 @@ function mapInteractionToForm(interaction) {
       interaction.next_action_scheduled_purpose ||
       interaction.next_action ||
       "",
-    NextActionAt: localDateTimeInput(
+    NextActionAt: formatDateTimeInput(
       interaction.next_action_scheduled_at ||
         interaction.next_action_at ||
         interaction.next_action_date
@@ -354,6 +323,9 @@ export default function CustomerInteractionsDialog({
     setForm((current) => ({
       ...current,
       [name]: value,
+      ...(name === "NextAction" && value.trim() && !current.NextActionAt
+        ? { NextActionAt: formatDateTimeInput() }
+        : {}),
     }));
   }
 
@@ -417,14 +389,20 @@ export default function CustomerInteractionsDialog({
       setError("");
       setSuccess("");
 
+      const interactionAt = dateTimeInputToIso(form.InteractionAt);
+      const nextActionAt = form.NextActionAt
+        ? dateTimeInputToIso(form.NextActionAt)
+        : null;
+
+      if (!interactionAt || (form.NextActionAt && !nextActionAt)) {
+        setError("Use DD/MM/YYYY hh:mm AM/PM for date and time fields");
+        return;
+      }
+
       const payload = {
         ...form,
-        InteractionAt: new Date(
-          form.InteractionAt
-        ).toISOString(),
-        NextActionAt: form.NextActionAt
-          ? new Date(form.NextActionAt).toISOString()
-          : null,
+        InteractionAt: interactionAt,
+        NextActionAt: nextActionAt,
       };
       let interactionId =
         editingInteraction?.interaction_id;
@@ -750,7 +728,7 @@ export default function CustomerInteractionsDialog({
                           "Follow up"}
                         {(interaction.next_action_scheduled_at ||
                           interaction.next_action_at)
-                          ? ` - ${formatDateTime(
+                          ? ` - ${formatDateTimeDisplay(
                               interaction.next_action_scheduled_at ||
                                 interaction.next_action_at
                             )}`
@@ -931,13 +909,11 @@ export default function CustomerInteractionsDialog({
               <TextField
                 label="Date and time"
                 name="InteractionAt"
-                type="datetime-local"
                 value={form.InteractionAt}
                 onChange={handleChange}
                 required
-                slotProps={{
-                  inputLabel: { shrink: true },
-                }}
+                placeholder="DD/MM/YYYY hh:mm AM"
+                helperText="Format: DD/MM/YYYY hh:mm AM/PM"
               />
 
               <TextField
@@ -994,12 +970,10 @@ export default function CustomerInteractionsDialog({
               <TextField
                 label="Next action date and time"
                 name="NextActionAt"
-                type="datetime-local"
                 value={form.NextActionAt}
                 onChange={handleChange}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                }}
+                placeholder="DD/MM/YYYY hh:mm AM"
+                helperText="Defaults to the current time when Next Action is entered."
               />
 
               <Box sx={{ gridColumn: { sm: "1 / -1" } }}>
