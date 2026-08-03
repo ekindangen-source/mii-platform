@@ -817,7 +817,7 @@ export default function Customers() {
                         variant="caption"
                         color="text.secondary"
                       >
-                        {customer.industry || "Ã¢â‚¬â€"}
+                        {customer.industry || "-"}
                       </Typography>
                     </TableCell>
 
@@ -829,9 +829,7 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_name ||
-                        customer.contact_person ||
-                        "Ã¢â‚¬â€"}
+                      {customer.primary_contact_name || customer.contact_person || "-"}
                     </TableCell>
 
                     <TableCell
@@ -842,11 +840,11 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.province || "Ã¢â‚¬â€"}
+                      {customer.province || "-"}
                     </TableCell>
 
                     <TableCell align="right">
-                      {customer.fleet_size ?? "Ã¢â‚¬â€"}
+                      {customer.fleet_size ?? "-"}
                     </TableCell>
 
                     <TableCell
@@ -857,9 +855,7 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_telephone ||
-                        customer.telephone ||
-                        "Ã¢â‚¬â€"}
+                      {customer.primary_contact_telephone || customer.telephone || "-"}
                     </TableCell>
 
                     <TableCell
@@ -870,9 +866,7 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_email ||
-                        customer.email ||
-                        "Ã¢â‚¬â€"}
+                      {customer.primary_contact_email || customer.email || "-"}
                     </TableCell>
 
                     <TableCell align="right">
