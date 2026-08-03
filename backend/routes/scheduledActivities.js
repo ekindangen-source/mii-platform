@@ -844,9 +844,18 @@ router.post(
       );
 
       const nextAction = nullable(body.NextAction);
-      const nextActionDate = normalizeNextActionDate(
-        body.NextActionDate
+      const nextActionAt = normalizeTimestamp(
+        body.NextActionAt,
+        "Next action date and time"
       );
+
+      if (Boolean(nextAction) !== Boolean(nextActionAt)) {
+        const error = new Error(
+          "Next action and next action date and time must both be provided"
+        );
+        error.status = 400;
+        throw error;
+      }
 
       const interaction = await client.query(
         `INSERT INTO customer_interactions
@@ -859,10 +868,18 @@ router.post(
            notes,
            next_action,
            next_action_date,
+           next_action_at,
            created_by,
            updated_by
          )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+         VALUES (
+           $1,$2,$3,$4,$5,$6,$7,
+           CASE
+             WHEN $8::timestamptz IS NULL THEN NULL
+             ELSE ($8::timestamptz AT TIME ZONE $9)::date
+           END,
+           $8,$10,$10
+         )
          RETURNING interaction_id`,
         [
           activity.customer_id,
@@ -872,14 +889,15 @@ router.post(
           nullable(body.Participants),
           outcomeNotes,
           nextAction,
-          nextActionDate,
+          nextActionAt,
+          DEFAULT_TIMEZONE,
           req.user.userId,
         ]
       );
 
       let followUpActivityId = null;
 
-      if (nextActionDate) {
+      if (nextActionAt) {
         const followUpPurpose =
           nextAction || `Follow-up: ${activity.purpose}`;
         const followUpNotes =
@@ -899,6 +917,7 @@ router.post(
              notes,
              reminder_at,
              status,
+             source_interaction_id,
              created_by,
              updated_by
            )
@@ -907,27 +926,14 @@ router.post(
              sa.contact_id,
              sa.assigned_to,
              'follow_up',
-             (
-               (
-                 $2::date +
-                 (sa.scheduled_start AT TIME ZONE $3)::time
-               )::timestamp AT TIME ZONE $3
-             ),
-             CASE
-               WHEN sa.scheduled_end IS NULL THEN NULL
-               ELSE
-                 (
-                   (
-                     $2::date +
-                     (sa.scheduled_start AT TIME ZONE $3)::time
-                   )::timestamp AT TIME ZONE $3
-                 ) + (sa.scheduled_end - sa.scheduled_start)
-             END,
+             $2::timestamptz,
              NULL,
+             NULL,
+             $3,
              $4,
-             $5,
-             NULL,
+             $2::timestamptz - INTERVAL '15 minutes',
              'planned',
+             $5,
              $6,
              $6
            FROM scheduled_activities sa
@@ -935,10 +941,10 @@ router.post(
            RETURNING activity_id`,
           [
             activity.activity_id,
-            nextActionDate,
-            DEFAULT_TIMEZONE,
+            nextActionAt,
             followUpPurpose,
             followUpNotes,
+            interaction.rows[0].interaction_id,
             req.user.userId,
           ]
         );

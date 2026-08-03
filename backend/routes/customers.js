@@ -42,11 +42,22 @@ router.post(
   requireAuth,
   requireRole("admin", "manager", "sales"),
   async (req, res) => {
+    const client = await pool.connect();
+
     try {
       const r = req.body;
       const accountType = normalizeAccountType(
         r.AccountType
       );
+      const initialPicName = String(
+        r.InitialPICName || ""
+      ).trim();
+      const initialPicTitle = nullable(
+        r.InitialPICTitle
+      );
+      const initialPicPhone = String(
+        r.InitialPICPhone || ""
+      ).trim();
 
       if (!accountType) {
         return res.status(400).json({
@@ -63,7 +74,23 @@ router.post(
         });
       }
 
-      const result = await pool.query(
+      if (!initialPicName) {
+        return res.status(400).json({
+          status: "ERROR",
+          message: "Initial PIC name is required",
+        });
+      }
+
+      if (!initialPicPhone) {
+        return res.status(400).json({
+          status: "ERROR",
+          message: "Initial PIC phone number is required",
+        });
+      }
+
+      await client.query("BEGIN");
+
+      const result = await client.query(
         `INSERT INTO customers
         (
           account_type,
@@ -94,8 +121,8 @@ router.post(
           accountType,
           String(r.Company).trim(),
           nullable(r.Industry),
-          nullable(r.ContactPerson),
-          nullable(r.Position),
+          initialPicName,
+          initialPicTitle,
           nullable(r.Province),
           nullable(r.HomePort),
           r.FleetSize || null,
@@ -103,7 +130,7 @@ router.post(
           nullable(r.DecisionMaker),
           nullable(r.CurrentSupplier),
           nullable(r.Email),
-          nullable(r.Telephone),
+          initialPicPhone,
           nullable(r.Address),
           nullable(r.Notes),
           nullable(r.Source),
@@ -111,15 +138,44 @@ router.post(
         ]
       );
 
+      const contactResult = await client.query(
+        `INSERT INTO customer_contacts
+         (
+           customer_id,
+           full_name,
+           job_title,
+           telephone,
+           is_primary,
+           is_active,
+           created_by,
+           updated_by
+         )
+         VALUES ($1,$2,$3,$4,true,true,$5,$5)
+         RETURNING *`,
+        [
+          result.rows[0].customer_id,
+          initialPicName,
+          initialPicTitle,
+          initialPicPhone,
+          req.user.userId,
+        ]
+      );
+
+      await client.query("COMMIT");
+
       res.status(201).json({
         status: "OK",
         customer: result.rows[0],
+        primaryContact: contactResult.rows[0],
       });
     } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
       res.status(500).json({
         status: "ERROR",
         message: err.message,
       });
+    } finally {
+      client.release();
     }
   }
 );

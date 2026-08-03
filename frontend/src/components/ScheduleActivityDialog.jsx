@@ -14,49 +14,20 @@ import {
 
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
-
-function toLocalInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const local = new Date(
-    date.getTime() - date.getTimezoneOffset() * 60000
-  );
-
-  return local.toISOString().slice(0, 16);
-}
-
-function toIso(value) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? null
-    : date.toISOString();
-}
+import {
+  dateTimeInputToIso,
+  formatDateTimeInput,
+} from "../utils/dateTime";
 
 function defaultTimes() {
   const start = new Date();
-  start.setMinutes(0, 0, 0);
-  start.setHours(start.getHours() + 1);
+  start.setSeconds(0, 0);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
-  const reminder = new Date(
-    start.getTime() - 30 * 60 * 1000
-  );
 
   return {
-    ScheduledStart: toLocalInput(start),
-    ScheduledEnd: toLocalInput(end),
-    ReminderAt: toLocalInput(reminder),
+    ScheduledStart: formatDateTimeInput(start),
+    ScheduledEnd: formatDateTimeInput(end),
+    ReminderAt: "",
   };
 }
 
@@ -81,9 +52,9 @@ function mapActivity(activity) {
     AssignedTo: activity.assigned_to || "",
     ActivityType: activity.activity_type || "meeting",
     Status: activity.status || "planned",
-    ScheduledStart: toLocalInput(activity.scheduled_start),
-    ScheduledEnd: toLocalInput(activity.scheduled_end),
-    ReminderAt: toLocalInput(activity.reminder_at),
+    ScheduledStart: formatDateTimeInput(activity.scheduled_start),
+    ScheduledEnd: formatDateTimeInput(activity.scheduled_end),
+    ReminderAt: formatDateTimeInput(activity.reminder_at),
     Location: activity.location || "",
     Purpose: activity.purpose || "",
     Notes: activity.notes || "",
@@ -243,15 +214,32 @@ export default function ScheduleActivityDialog({
       setSaving(true);
       setError("");
 
+      const scheduledStart = dateTimeInputToIso(form.ScheduledStart);
+      const scheduledEnd = form.ScheduledEnd
+        ? dateTimeInputToIso(form.ScheduledEnd)
+        : null;
+      const reminderAt = form.ReminderAt
+        ? dateTimeInputToIso(form.ReminderAt)
+        : null;
+
+      if (
+        !scheduledStart ||
+        (form.ScheduledEnd && !scheduledEnd) ||
+        (form.ReminderAt && !reminderAt)
+      ) {
+        setError("Use DD/MM/YYYY hh:mm AM/PM for date and time fields.");
+        return;
+      }
+
       const payload = {
         CustomerID: form.CustomerID,
         ContactID: form.ContactID || null,
         AssignedTo: form.AssignedTo || user?.userId,
         ActivityType: form.ActivityType,
         Status: form.Status,
-        ScheduledStart: toIso(form.ScheduledStart),
-        ScheduledEnd: toIso(form.ScheduledEnd),
-        ReminderAt: toIso(form.ReminderAt),
+        ScheduledStart: scheduledStart,
+        ScheduledEnd: scheduledEnd,
+        ReminderAt: reminderAt,
         Location: form.Location,
         Purpose: form.Purpose,
         Notes: form.Notes,
@@ -409,31 +397,29 @@ export default function ScheduleActivityDialog({
 
               <TextField
                 required
-                type="datetime-local"
                 label="Scheduled start"
                 value={form.ScheduledStart}
                 onChange={updateField("ScheduledStart")}
                 disabled={saving}
-                slotProps={{ inputLabel: { shrink: true } }}
+                placeholder="DD/MM/YYYY hh:mm AM"
+                helperText="Format: DD/MM/YYYY hh:mm AM/PM"
               />
 
               <TextField
-                type="datetime-local"
                 label="Scheduled end"
                 value={form.ScheduledEnd}
                 onChange={updateField("ScheduledEnd")}
                 disabled={saving}
-                slotProps={{ inputLabel: { shrink: true } }}
+                placeholder="DD/MM/YYYY hh:mm AM"
               />
 
               <TextField
-                type="datetime-local"
                 label="Email reminder"
                 value={form.ReminderAt}
                 onChange={updateField("ReminderAt")}
                 disabled={saving}
-                helperText="Reminder is emailed to the assigned user."
-                slotProps={{ inputLabel: { shrink: true } }}
+                placeholder="DD/MM/YYYY hh:mm AM"
+                helperText="Optional. Reminder is emailed to the assigned user."
               />
 
               <TextField

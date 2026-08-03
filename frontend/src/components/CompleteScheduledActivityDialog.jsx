@@ -11,14 +11,10 @@ import {
 } from "@mui/material";
 
 import api from "../services/api";
-
-function toLocalInput(value) {
-  const date = value ? new Date(value) : new Date();
-  const local = new Date(
-    date.getTime() - date.getTimezoneOffset() * 60000
-  );
-  return local.toISOString().slice(0, 16);
-}
+import {
+  dateTimeInputToIso,
+  formatDateTimeInput,
+} from "../utils/dateTime";
 
 export default function CompleteScheduledActivityDialog({
   open,
@@ -27,11 +23,11 @@ export default function CompleteScheduledActivityDialog({
   onCompleted,
 }) {
   const [form, setForm] = useState({
-    InteractionAt: toLocalInput(),
+    InteractionAt: formatDateTimeInput(),
     Participants: "",
     OutcomeNotes: "",
     NextAction: "",
-    NextActionDate: "",
+    NextActionAt: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -43,14 +39,14 @@ export default function CompleteScheduledActivityDialog({
 
     setError("");
     setForm({
-      InteractionAt: toLocalInput(),
+      InteractionAt: formatDateTimeInput(),
       Participants: "",
       OutcomeNotes:
         activity?.notes ||
         activity?.purpose ||
         "",
       NextAction: "",
-      NextActionDate: "",
+      NextActionAt: "",
     });
   }, [activity, open]);
 
@@ -59,6 +55,9 @@ export default function CompleteScheduledActivityDialog({
       setForm((current) => ({
         ...current,
         [field]: event.target.value,
+        ...(field === "NextAction" && event.target.value.trim() && !current.NextActionAt
+          ? { NextActionAt: formatDateTimeInput() }
+          : {}),
       }));
     };
   }
@@ -74,17 +73,25 @@ export default function CompleteScheduledActivityDialog({
     try {
       setSaving(true);
       setError("");
-      const interactionAt = new Date(form.InteractionAt);
+      const interactionAt = dateTimeInputToIso(form.InteractionAt);
+      const nextActionAt = form.NextActionAt
+        ? dateTimeInputToIso(form.NextActionAt)
+        : null;
+
+      if (!interactionAt || (form.NextActionAt && !nextActionAt)) {
+        setError("Use DD/MM/YYYY hh:mm AM/PM for date and time fields.");
+        return;
+      }
       const response = await api.post(
         `/scheduled-activities/${encodeURIComponent(
           activity.activity_id
         )}/complete`,
         {
-          InteractionAt: interactionAt.toISOString(),
+          InteractionAt: interactionAt,
           Participants: form.Participants,
           OutcomeNotes: form.OutcomeNotes,
           NextAction: form.NextAction,
-          NextActionDate: form.NextActionDate || null,
+          NextActionAt: nextActionAt,
         }
       );
 
@@ -118,12 +125,12 @@ export default function CompleteScheduledActivityDialog({
           )}
           <Box sx={{ display: "grid", gap: 2 }}>
             <TextField
-              type="datetime-local"
               required
               label="Interaction date and time"
               value={form.InteractionAt}
               onChange={updateField("InteractionAt")}
-              slotProps={{ inputLabel: { shrink: true } }}
+              placeholder="DD/MM/YYYY hh:mm AM"
+              helperText="Format: DD/MM/YYYY hh:mm AM/PM"
             />
             <TextField
               label="Participants"
@@ -144,12 +151,11 @@ export default function CompleteScheduledActivityDialog({
               onChange={updateField("NextAction")}
             />
             <TextField
-              type="date"
-              label="Next action date"
-              value={form.NextActionDate}
-              onChange={updateField("NextActionDate")}
-              helperText="Selecting a date creates a planned Follow-up in Agenda at the same time as the original activity."
-              slotProps={{ inputLabel: { shrink: true } }}
+              label="Next action date and time"
+              value={form.NextActionAt}
+              onChange={updateField("NextActionAt")}
+              placeholder="DD/MM/YYYY hh:mm AM"
+              helperText="Defaults to the current time when Next Action is entered."
             />
           </Box>
         </DialogContent>

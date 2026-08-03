@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
-  Button,
   Chip,
   CircularProgress,
   IconButton,
@@ -14,19 +13,19 @@ import {
   Typography,
 } from "@mui/material";
 
-import AddIcon from "@mui/icons-material/Add";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
+import HistoryIcon from "@mui/icons-material/History";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import ScheduleActivityDialog from "../components/ScheduleActivityDialog";
+import {
+  dateInputToIsoDate,
+  formatDateInput,
+} from "../utils/dateTime";
 import CompleteScheduledActivityDialog from "../components/CompleteScheduledActivityDialog";
-import ConfirmDialog from "../components/ConfirmDialog";
 import {
   OPEN_ACTIVITY_STATUSES,
   formatActivityDateTime,
@@ -36,20 +35,12 @@ import {
 } from "../utils/scheduledActivities";
 
 function localDateValue(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return formatDateInput(date);
 }
 
-function ActivityCard({
-  activity,
-  canWrite,
-  canDelete,
-  onEdit,
-  onComplete,
-  onDelete,
-}) {
+function ActivityCard({ activity, canWrite, onComplete }) {
+  const fromInteraction = Boolean(activity.source_interaction_id);
+
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
       <Stack
@@ -71,6 +62,24 @@ function ActivityCard({
               {activity.activity_id}
             </Typography>
           </Stack>
+
+          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+            {fromInteraction ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                icon={<HistoryIcon />}
+                label={`From interaction ${activity.source_interaction_id}`}
+              />
+            ) : (
+              <Chip
+                size="small"
+                variant="outlined"
+                label="Managed in Meetings & Visits"
+              />
+            )}
+          </Stack>
+
           <Typography variant="body2">
             <strong>{formatActivityDateTime(activity.scheduled_start)}</strong>
           </Typography>
@@ -81,14 +90,10 @@ function ActivityCard({
             Assigned to: {activity.assigned_to_name}
           </Typography>
           {activity.contact_name && (
-            <Typography variant="body2">
-              PIC: {activity.contact_name}
-            </Typography>
+            <Typography variant="body2">PIC: {activity.contact_name}</Typography>
           )}
           {activity.location && (
-            <Typography variant="body2">
-              Location: {activity.location}
-            </Typography>
+            <Typography variant="body2">Location: {activity.location}</Typography>
           )}
           <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
             {activity.purpose}
@@ -108,34 +113,13 @@ function ActivityCard({
               </IconButton>
             </Tooltip>
           )}
-          {canWrite && activity.status !== "completed" && (
-            <Tooltip title="Edit">
-              <IconButton onClick={() => onEdit(activity)}>
-                <EditIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-          {canDelete && activity.status !== "completed" && (
-            <Tooltip title="Delete">
-              <IconButton color="error" onClick={() => onDelete(activity)}>
-                <DeleteIcon />
-              </IconButton>
-            </Tooltip>
-          )}
         </Stack>
       </Stack>
     </Paper>
   );
 }
 
-function AgendaSection({
-  title,
-  subtitle,
-  icon,
-  rows,
-  emptyText,
-  ...actions
-}) {
+function AgendaSection({ title, subtitle, icon, rows, emptyText, ...actions }) {
   return (
     <Paper sx={{ p: 2.5, borderRadius: 3 }}>
       <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
@@ -155,11 +139,7 @@ function AgendaSection({
       {rows.length ? (
         <Stack spacing={1.25}>
           {rows.map((activity) => (
-            <ActivityCard
-              key={activity.activity_id}
-              activity={activity}
-              {...actions}
-            />
+            <ActivityCard key={activity.activity_id} activity={activity} {...actions} />
           ))}
         </Stack>
       ) : (
@@ -176,7 +156,6 @@ export default function Agenda() {
   const canWrite = ["admin", "manager", "sales", "technician"].includes(
     user?.role
   );
-  const canDelete = ["admin", "manager"].includes(user?.role);
   const canViewAll = ["admin", "manager"].includes(user?.role);
 
   const [date, setDate] = useState(localDateValue());
@@ -190,11 +169,7 @@ export default function Agenda() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [completing, setCompleting] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
 
   const assignedName = useMemo(() => {
     if (!canViewAll || assignedTo === "all") {
@@ -211,9 +186,17 @@ export default function Agenda() {
     try {
       setLoading(true);
       setError("");
+      const reportDate = dateInputToIsoDate(date);
+
+      if (!reportDate) {
+        setError("Agenda date must use DD/MM/YYYY");
+        setLoading(false);
+        return;
+      }
+
       const response = await api.get("/scheduled-activities/agenda", {
         params: {
-          date,
+          date: reportDate,
           timeZone: "Asia/Jakarta",
           ...(canViewAll ? { assignedTo } : {}),
         },
@@ -226,9 +209,7 @@ export default function Agenda() {
       });
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Unable to load agenda"
+        err.response?.data?.message || err.message || "Unable to load agenda"
       );
     } finally {
       setLoading(false);
@@ -248,30 +229,6 @@ export default function Agenda() {
     loadAgenda();
   }, [date, assignedTo]);
 
-  async function confirmDelete() {
-    if (!deleteTarget) {
-      return;
-    }
-
-    try {
-      setDeleting(true);
-      await api.delete(
-        `/scheduled-activities/${encodeURIComponent(
-          deleteTarget.activity_id
-        )}`
-      );
-      setDeleteTarget(null);
-      await loadAgenda();
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Unable to delete scheduled activity"
-      );
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   return (
     <Box>
       <Stack
@@ -282,22 +239,20 @@ export default function Agenda() {
         sx={{ mb: 3 }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={900}>
-            Meeting & Visit Agenda
-          </Typography>
+          <Typography variant="h4" fontWeight={900}>Agenda</Typography>
           <Typography color="text.secondary">
-            {assignedName} · Jakarta time
+            {assignedName} - planned customer activities in Jakarta time
           </Typography>
         </Box>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
           <TextField
-            type="date"
             size="small"
             label="Agenda date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
+            placeholder="DD/MM/YYYY"
+            helperText="Format: DD/MM/YYYY"
           />
           {canViewAll && (
             <TextField
@@ -321,25 +276,11 @@ export default function Agenda() {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          {canWrite && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setEditing(null);
-                setEditorOpen(true);
-              }}
-            >
-              Schedule
-            </Button>
-          )}
         </Stack>
       </Stack>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
       )}
 
       {loading ? (
@@ -355,13 +296,7 @@ export default function Agenda() {
             rows={agenda.overdue}
             emptyText="No overdue activities."
             canWrite={canWrite}
-            canDelete={canDelete}
-            onEdit={(activity) => {
-              setEditing(activity);
-              setEditorOpen(true);
-            }}
             onComplete={setCompleting}
-            onDelete={setDeleteTarget}
           />
           <AgendaSection
             title="Selected day"
@@ -370,13 +305,7 @@ export default function Agenda() {
             rows={agenda.today}
             emptyText="Nothing scheduled for this date."
             canWrite={canWrite}
-            canDelete={canDelete}
-            onEdit={(activity) => {
-              setEditing(activity);
-              setEditorOpen(true);
-            }}
             onComplete={setCompleting}
-            onDelete={setDeleteTarget}
           />
           <AgendaSection
             title="Upcoming 7 days"
@@ -385,46 +314,16 @@ export default function Agenda() {
             rows={agenda.upcoming}
             emptyText="No upcoming activities in the next seven days."
             canWrite={canWrite}
-            canDelete={canDelete}
-            onEdit={(activity) => {
-              setEditing(activity);
-              setEditorOpen(true);
-            }}
             onComplete={setCompleting}
-            onDelete={setDeleteTarget}
           />
         </Stack>
       )}
-
-      <ScheduleActivityDialog
-        open={editorOpen}
-        activity={editing}
-        onClose={() => {
-          setEditorOpen(false);
-          setEditing(null);
-        }}
-        onSaved={loadAgenda}
-      />
 
       <CompleteScheduledActivityDialog
         open={Boolean(completing)}
         activity={completing}
         onClose={() => setCompleting(null)}
         onCompleted={loadAgenda}
-      />
-
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        title="Delete scheduled activity?"
-        message={
-          deleteTarget
-            ? `${deleteTarget.activity_id} will be permanently deleted.`
-            : ""
-        }
-        confirmLabel="Delete"
-        loading={deleting}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
       />
     </Box>
   );
