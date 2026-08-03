@@ -50,6 +50,13 @@ import {
   canDeleteModule,
   canWriteModule,
 } from "../utils/permissions";
+import {
+  primaryCellSx,
+  responsiveTableSx,
+  stickyActionCellSx,
+  stickyActionHeaderSx,
+  truncateTextSx,
+} from "../utils/responsiveTable";
 
 const emptyForm = {
   AccountType: "organization",
@@ -75,12 +82,10 @@ const emptyForm = {
 };
 
 const sortableColumns = [
-  { id: "customer_id", label: "Customer ID" },
-  { id: "company", label: "Company" },
-  { id: "primary_contact_name", label: "Contact" },
+  { id: "company", label: "Customer" },
+  { id: "primary_contact_name", label: "Primary PIC" },
   { id: "assigned_to_name", label: "Salesperson" },
   { id: "province", label: "Province" },
-  { id: "fleet_size", label: "Fleet", numeric: true },
 ];
 
 function mapRowToForm(row) {
@@ -853,7 +858,7 @@ export default function Customers() {
               <CircularProgress />
             </Box>
           ) : (
-            <Table size="small">
+            <Table size="small" sx={responsiveTableSx}>
               <TableHead>
                 <TableRow>
                   {sortableColumns.map((column) => (
@@ -868,14 +873,11 @@ export default function Customers() {
                                 md: "table-cell",
                               }
                             : column.id === "assigned_to_name"
-                              ? {
-                                  xs: "none",
-                                  md: "table-cell",
-                                }
+                              ? "table-cell"
                             : column.id === "province"
                               ? {
                                   xs: "none",
-                                  sm: "table-cell",
+                                  lg: "table-cell",
                                 }
                               : "table-cell",
                       }}
@@ -896,29 +898,7 @@ export default function Customers() {
                     </TableCell>
                   ))}
 
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        lg: "table-cell",
-                      },
-                    }}
-                  >
-                    Telephone
-                  </TableCell>
-
-                  <TableCell
-                    sx={{
-                      display: {
-                        xs: "none",
-                        lg: "table-cell",
-                      },
-                    }}
-                  >
-                    Email
-                  </TableCell>
-
-                  <TableCell align="right">
+                  <TableCell align="right" sx={stickyActionHeaderSx}>
                     Actions
                   </TableCell>
                 </TableRow>
@@ -944,14 +924,10 @@ export default function Customers() {
                     }}
                     sx={{ cursor: "pointer" }}
                   >
-                    <TableCell>
-                      {customer.customer_id}
-                    </TableCell>
-
-                    <TableCell>
+                    <TableCell sx={primaryCellSx}>
                       <Typography
                         variant="body2"
-                        sx={{ fontWeight: 600 }}
+                        sx={{ fontWeight: 600, ...truncateTextSx }}
                       >
                         {customer.company}
                       </Typography>
@@ -959,8 +935,11 @@ export default function Customers() {
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        sx={truncateTextSx}
                       >
-                        {customer.industry || "-"}
+                        {[customer.customer_id, customer.industry]
+                          .filter(Boolean)
+                          .join(" · ") || "-"}
                       </Typography>
                     </TableCell>
 
@@ -972,33 +951,22 @@ export default function Customers() {
                         },
                       }}
                     >
-                      {customer.primary_contact_name || customer.contact_person || "-"}
+                      <Typography variant="body2" sx={truncateTextSx}>
+                        {customer.primary_contact_name || customer.contact_person || "-"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={truncateTextSx}>
+                        {customer.primary_contact_telephone || customer.telephone || "-"}
+                      </Typography>
                     </TableCell>
 
                     <TableCell
                       sx={{
-                        display: {
-                          xs: "none",
-                          md: "table-cell",
-                        },
+                        ...primaryCellSx,
                       }}
                     >
-                      {customer.assigned_to_name || "Unassigned"}
-                    </TableCell>
-
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          sm: "table-cell",
-                        },
-                      }}
-                    >
-                      {customer.province || "-"}
-                    </TableCell>
-
-                    <TableCell align="right">
-                      {customer.fleet_size ?? "-"}
+                      <Typography variant="body2" sx={truncateTextSx}>
+                        {customer.assigned_to_name || "Unassigned"}
+                      </Typography>
                     </TableCell>
 
                     <TableCell
@@ -1007,23 +975,15 @@ export default function Customers() {
                           xs: "none",
                           lg: "table-cell",
                         },
+                        ...primaryCellSx,
                       }}
                     >
-                      {customer.primary_contact_telephone || customer.telephone || "-"}
+                      <Typography variant="body2" sx={truncateTextSx}>
+                        {customer.province || "-"}
+                      </Typography>
                     </TableCell>
 
-                    <TableCell
-                      sx={{
-                        display: {
-                          xs: "none",
-                          lg: "table-cell",
-                        },
-                      }}
-                    >
-                      {customer.primary_contact_email || customer.email || "-"}
-                    </TableCell>
-
-                    <TableCell align="right">
+                    <TableCell align="right" sx={stickyActionCellSx}>
                       <Tooltip title="Customer actions">
                         <IconButton
                           size="small"
@@ -1041,7 +1001,7 @@ export default function Customers() {
                 {!visibleCustomers.length && (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={5}
                       align="center"
                       sx={{ py: 5 }}
                     >
