@@ -74,7 +74,7 @@ function emptyForm() {
 
 function formatDate(value) {
   if (!value) {
-    return "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â";
+    return "-";
   }
 
   const rawValue = String(value);
@@ -526,7 +526,7 @@ export default function CustomerInteractionsDialog({
                 variant="body2"
                 color="text.secondary"
               >
-                {customer?.company || "Customer"} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {customerId}
+                {customer?.company || "Customer"} - {customerId}
               </Typography>
             </Box>
 
@@ -622,14 +622,7 @@ export default function CustomerInteractionsDialog({
                           variant="subtitle2"
                           fontWeight={700}
                         >
-                          {formatDate(
-                            interaction.interaction_at
-                          )}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                        >
+                          {formatDate(interaction.interaction_at)} -{" "}
                           {interaction.interaction_id}
                         </Typography>
                       </Stack>
@@ -641,7 +634,7 @@ export default function CustomerInteractionsDialog({
                       >
                         PIC: {interaction.contact_name || "Not specified"}
                         {interaction.contact_job_title
-                          ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${interaction.contact_job_title}`
+                          ? ` - ${interaction.contact_job_title}`
                           : ""}
                       </Typography>
 
@@ -715,7 +708,7 @@ export default function CustomerInteractionsDialog({
                       <Typography variant="body2">
                         {interaction.next_action || "Follow up"}
                         {interaction.next_action_date
-                          ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${formatDate(
+                          ? ` - ${formatDate(
                               interaction.next_action_date
                             )}`
                           : ""}
@@ -818,7 +811,7 @@ export default function CustomerInteractionsDialog({
                     Recorded by {interaction.created_by_name || "Unknown user"}
                     {interaction.updated_at &&
                     interaction.updated_at !== interaction.created_at
-                      ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Updated ${formatDate(
+                      ? ` - Updated ${formatDate(
                           interaction.updated_at
                         )}`
                       : ""}
@@ -918,7 +911,7 @@ export default function CustomerInteractionsDialog({
                   >
                     {contact.full_name}
                     {contact.job_title
-                      ? ` ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ${contact.job_title}`
+                      ? ` - ${contact.job_title}`
                       : ""}
                     {!contact.is_active ? " (Inactive)" : ""}
                   </MenuItem>

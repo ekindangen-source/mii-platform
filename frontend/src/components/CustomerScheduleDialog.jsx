@@ -137,7 +137,7 @@ export default function CustomerScheduleDialog({
                 Meetings & Visits
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {customer?.company} Ã‚Â· {customer?.customer_id}
+                {customer?.company} - {customer?.customer_id}
               </Typography>
             </Box>
             {canWrite && (
