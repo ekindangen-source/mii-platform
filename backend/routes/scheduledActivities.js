@@ -747,6 +747,36 @@ router.put(
         ]
       );
 
+      if (existing.source_interaction_id) {
+        await client.query(
+          `UPDATE customer_interactions
+           SET
+             next_action = CASE
+               WHEN $6 IN ('cancelled', 'no_show') THEN NULL
+               ELSE $2
+             END,
+             next_action_at = CASE
+               WHEN $6 IN ('cancelled', 'no_show') THEN NULL
+               ELSE $3::timestamptz
+             END,
+             next_action_date = CASE
+               WHEN $6 IN ('cancelled', 'no_show') THEN NULL
+               ELSE ($3::timestamptz AT TIME ZONE $4)::date
+             END,
+             updated_by = $5,
+             updated_at = NOW()
+           WHERE interaction_id = $1`,
+          [
+            existing.source_interaction_id,
+            purpose,
+            start,
+            DEFAULT_TIMEZONE,
+            req.user.userId,
+            status,
+          ]
+        );
+      }
+
       await client.query("COMMIT");
 
       return res.json({
@@ -966,6 +996,7 @@ router.delete(
            activity_id = $1
            AND completed_interaction_id IS NULL
            AND status <> 'completed'
+           AND source_interaction_id IS NULL
          RETURNING *`,
         [req.params.activityId]
       );
@@ -974,7 +1005,7 @@ router.delete(
         return res.status(409).json({
           status: "ERROR",
           message:
-            "Scheduled activity was not found or has already been completed",
+            "Scheduled activity was not found, has already been completed, or is managed from Interaction History",
         });
       }
 

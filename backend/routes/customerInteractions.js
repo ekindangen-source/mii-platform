@@ -67,22 +67,154 @@ function normalizeInteractionAt(value) {
   return parsed.toISOString();
 }
 
-function normalizeNextActionDate(value) {
+function normalizeNextActionAt(value) {
   const normalized = nullable(value);
 
   if (!normalized) {
     return null;
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    const error = new Error(
-      "Next action date must use YYYY-MM-DD"
-    );
+  const parsed = new Date(normalized);
+
+  if (Number.isNaN(parsed.getTime())) {
+    const error = new Error("Next action date and time is invalid");
     error.status = 400;
     throw error;
   }
 
-  return normalized;
+  return parsed.toISOString();
+}
+
+function validateNextAction(nextAction, nextActionAt) {
+  if (Boolean(nextAction) !== Boolean(nextActionAt)) {
+    const error = new Error(
+      "Next action and next action date and time must both be provided"
+    );
+    error.status = 400;
+    throw error;
+  }
+}
+
+async function syncNextActionActivity(client, values) {
+  const {
+    interactionId,
+    customerId,
+    contactId,
+    nextAction,
+    nextActionAt,
+    assignedTo,
+    updatedBy,
+  } = values;
+  const existingResult = await client.query(
+    `SELECT *
+     FROM scheduled_activities
+     WHERE source_interaction_id = $1
+     FOR UPDATE`,
+    [interactionId]
+  );
+  const existing = existingResult.rows[0] || null;
+
+  if (!nextAction || !nextActionAt) {
+    if (existing && existing.status !== "completed") {
+      await client.query(
+        `UPDATE scheduled_activities
+         SET
+           status = 'cancelled',
+           reminder_at = NULL,
+           reminder_sent_at = NULL,
+           reminder_attempt_count = 0,
+           reminder_last_attempt_at = NULL,
+           reminder_error = NULL,
+           updated_by = $2,
+           updated_at = NOW()
+         WHERE activity_id = $1`,
+        [existing.activity_id, updatedBy]
+      );
+    }
+
+    return existing?.activity_id || null;
+  }
+
+  if (existing?.status === "completed") {
+    const error = new Error(
+      "The linked Agenda follow-up is completed and cannot be changed from the interaction"
+    );
+    error.status = 409;
+    throw error;
+  }
+
+  const reminderAt = new Date(
+    new Date(nextActionAt).getTime() - 15 * 60 * 1000
+  ).toISOString();
+
+  if (existing) {
+    await client.query(
+      `UPDATE scheduled_activities
+       SET
+         customer_id = $2,
+         contact_id = $3,
+         activity_type = 'follow_up',
+         scheduled_start = $4,
+         scheduled_end = NULL,
+         location = NULL,
+         purpose = $5,
+         notes = 'Created automatically from interaction ' || $6,
+         reminder_at = $7,
+         reminder_sent_at = NULL,
+         reminder_attempt_count = 0,
+         reminder_last_attempt_at = NULL,
+         reminder_error = NULL,
+         status = 'planned',
+         updated_by = $8,
+         updated_at = NOW()
+       WHERE activity_id = $1`,
+      [
+        existing.activity_id,
+        customerId,
+        contactId,
+        nextActionAt,
+        nextAction,
+        interactionId,
+        reminderAt,
+        updatedBy,
+      ]
+    );
+
+    return existing.activity_id;
+  }
+
+  const result = await client.query(
+    `INSERT INTO scheduled_activities
+     (
+       customer_id,
+       contact_id,
+       assigned_to,
+       activity_type,
+       scheduled_start,
+       purpose,
+       notes,
+       reminder_at,
+       status,
+       source_interaction_id,
+       created_by,
+       updated_by
+     )
+     VALUES ($1,$2,$3,'follow_up',$4,$5,$6,$7,'planned',$8,$9,$9)
+     RETURNING activity_id`,
+    [
+      customerId,
+      contactId,
+      assignedTo,
+      nextActionAt,
+      nextAction,
+      `Created automatically from interaction ${interactionId}`,
+      reminderAt,
+      interactionId,
+      updatedBy,
+    ]
+  );
+
+  return result.rows[0].activity_id;
 }
 
 function decodePhoto(body) {
@@ -262,7 +394,17 @@ async function loadInteractions(customerId) {
        cc.full_name AS contact_name,
        cc.job_title AS contact_job_title,
        creator.full_name AS created_by_name,
-       updater.full_name AS updated_by_name
+       updater.full_name AS updated_by_name,
+       next_activity.activity_id AS next_action_activity_id,
+       next_activity.status AS next_action_activity_status,
+       CASE
+         WHEN next_activity.status IN ('cancelled', 'no_show') THEN NULL
+         ELSE next_activity.scheduled_start
+       END AS next_action_scheduled_at,
+       CASE
+         WHEN next_activity.status IN ('cancelled', 'no_show') THEN NULL
+         ELSE next_activity.purpose
+       END AS next_action_scheduled_purpose
      FROM customer_interactions ci
      LEFT JOIN customer_contacts cc
        ON cc.contact_id = ci.contact_id
@@ -270,6 +412,8 @@ async function loadInteractions(customerId) {
        ON creator.user_id = ci.created_by
      LEFT JOIN app_users updater
        ON updater.user_id = ci.updated_by
+     LEFT JOIN scheduled_activities next_activity
+       ON next_activity.source_interaction_id = ci.interaction_id
      WHERE ci.customer_id = $1
      ORDER BY
        ci.interaction_at DESC,
@@ -326,6 +470,8 @@ router.post(
       const interactionType =
         normalizeInteractionType(body.InteractionType);
       const notes = String(body.Notes || "").trim();
+      const nextAction = nullable(body.NextAction);
+      const nextActionAt = normalizeNextActionAt(body.NextActionAt);
 
       if (!interactionType) {
         return res.status(400).json({
@@ -341,6 +487,9 @@ router.post(
         });
       }
 
+      validateNextAction(nextAction, nextActionAt);
+
+      await client.query("BEGIN");
       await ensureCustomer(client, customerId);
       const contactId = await validateContact(
         client,
@@ -359,11 +508,19 @@ router.post(
            notes,
            next_action,
            next_action_date,
+           next_action_at,
            created_by,
            updated_by
          )
          VALUES
-         ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+         (
+           $1,$2,$3,$4,$5,$6,$7,
+           CASE
+             WHEN $8::timestamptz IS NULL THEN NULL
+             ELSE ($8::timestamptz AT TIME ZONE 'Asia/Jakarta')::date
+           END,
+           $8,$9,$9
+         )
          RETURNING interaction_id`,
         [
           customerId,
@@ -372,13 +529,23 @@ router.post(
           normalizeInteractionAt(body.InteractionAt),
           nullable(body.Participants),
           notes,
-          nullable(body.NextAction),
-          normalizeNextActionDate(
-            body.NextActionDate
-          ),
+          nextAction,
+          nextActionAt,
           req.user.userId,
         ]
       );
+
+      await syncNextActionActivity(client, {
+        interactionId: result.rows[0].interaction_id,
+        customerId,
+        contactId,
+        nextAction,
+        nextActionAt,
+        assignedTo: req.user.userId,
+        updatedBy: req.user.userId,
+      });
+
+      await client.query("COMMIT");
 
       const interaction = await loadOneInteraction(
         customerId,
@@ -390,6 +557,7 @@ router.post(
         interaction,
       });
     } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
       return sendError(res, error);
     } finally {
       client.release();
@@ -413,6 +581,8 @@ router.put(
       const interactionType =
         normalizeInteractionType(body.InteractionType);
       const notes = String(body.Notes || "").trim();
+      const nextAction = nullable(body.NextAction);
+      const nextActionAt = normalizeNextActionAt(body.NextActionAt);
 
       if (!interactionType) {
         return res.status(400).json({
@@ -428,6 +598,10 @@ router.put(
         });
       }
 
+
+      validateNextAction(nextAction, nextActionAt);
+
+      await client.query("BEGIN");
       await ensureInteraction(
         client,
         customerId,
@@ -448,7 +622,11 @@ router.put(
            participants = $6,
            notes = $7,
            next_action = $8,
-           next_action_date = $9,
+           next_action_date = CASE
+             WHEN $9::timestamptz IS NULL THEN NULL
+             ELSE ($9::timestamptz AT TIME ZONE 'Asia/Jakarta')::date
+           END,
+           next_action_at = $9,
            updated_by = $10,
            updated_at = NOW()
          WHERE
@@ -462,13 +640,31 @@ router.put(
           normalizeInteractionAt(body.InteractionAt),
           nullable(body.Participants),
           notes,
-          nullable(body.NextAction),
-          normalizeNextActionDate(
-            body.NextActionDate
-          ),
+          nextAction,
+          nextActionAt,
           req.user.userId,
         ]
       );
+
+      const ownerResult = await client.query(
+        `SELECT created_by
+         FROM customer_interactions
+         WHERE interaction_id = $1`,
+        [interactionId]
+      );
+
+      await syncNextActionActivity(client, {
+        interactionId,
+        customerId,
+        contactId,
+        nextAction,
+        nextActionAt,
+        assignedTo:
+          ownerResult.rows[0]?.created_by || req.user.userId,
+        updatedBy: req.user.userId,
+      });
+
+      await client.query("COMMIT");
 
       return res.json({
         status: "OK",
@@ -478,6 +674,7 @@ router.put(
         ),
       });
     } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
       return sendError(res, error);
     } finally {
       client.release();
