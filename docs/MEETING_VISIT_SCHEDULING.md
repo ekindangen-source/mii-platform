@@ -57,3 +57,6 @@ The frontend production build must use:
 ```text
 VITE_API_BASE_URL=/api
 ```
+## Follow-up creation on completion
+
+When a scheduled activity is completed and a Next action date is supplied, MII automatically creates a new planned Follow-up activity in Agenda. It keeps the same customer, PIC, assigned user, and local time of day as the completed activity. The next-action text becomes the follow-up purpose.

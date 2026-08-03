@@ -148,6 +148,7 @@ export default function CompleteScheduledActivityDialog({
               label="Next action date"
               value={form.NextActionDate}
               onChange={updateField("NextActionDate")}
+              helperText="Selecting a date creates a planned Follow-up in Agenda at the same time as the original activity."
               slotProps={{ inputLabel: { shrink: true } }}
             />
           </Box>

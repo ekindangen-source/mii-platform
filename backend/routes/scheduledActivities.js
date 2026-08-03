@@ -813,6 +813,11 @@ router.post(
         true
       );
 
+      const nextAction = nullable(body.NextAction);
+      const nextActionDate = normalizeNextActionDate(
+        body.NextActionDate
+      );
+
       const interaction = await client.query(
         `INSERT INTO customer_interactions
          (
@@ -836,11 +841,81 @@ router.post(
           interactionAt,
           nullable(body.Participants),
           outcomeNotes,
-          nullable(body.NextAction),
-          normalizeNextActionDate(body.NextActionDate),
+          nextAction,
+          nextActionDate,
           req.user.userId,
         ]
       );
+
+      let followUpActivityId = null;
+
+      if (nextActionDate) {
+        const followUpPurpose =
+          nextAction || `Follow-up: ${activity.purpose}`;
+        const followUpNotes =
+          `Created automatically from completed activity ${activity.activity_id}.`;
+
+        const followUp = await client.query(
+          `INSERT INTO scheduled_activities
+           (
+             customer_id,
+             contact_id,
+             assigned_to,
+             activity_type,
+             scheduled_start,
+             scheduled_end,
+             location,
+             purpose,
+             notes,
+             reminder_at,
+             status,
+             created_by,
+             updated_by
+           )
+           SELECT
+             sa.customer_id,
+             sa.contact_id,
+             sa.assigned_to,
+             'follow_up',
+             (
+               (
+                 $2::date +
+                 (sa.scheduled_start AT TIME ZONE $3)::time
+               )::timestamp AT TIME ZONE $3
+             ),
+             CASE
+               WHEN sa.scheduled_end IS NULL THEN NULL
+               ELSE
+                 (
+                   (
+                     $2::date +
+                     (sa.scheduled_start AT TIME ZONE $3)::time
+                   )::timestamp AT TIME ZONE $3
+                 ) + (sa.scheduled_end - sa.scheduled_start)
+             END,
+             NULL,
+             $4,
+             $5,
+             NULL,
+             'planned',
+             $6,
+             $6
+           FROM scheduled_activities sa
+           WHERE sa.activity_id = $1
+           RETURNING activity_id`,
+          [
+            activity.activity_id,
+            nextActionDate,
+            DEFAULT_TIMEZONE,
+            followUpPurpose,
+            followUpNotes,
+            req.user.userId,
+          ]
+        );
+
+        followUpActivityId =
+          followUp.rows[0]?.activity_id || null;
+      }
 
       await client.query(
         `UPDATE scheduled_activities
@@ -862,9 +937,12 @@ router.post(
 
       return res.json({
         status: "OK",
-        message: "Activity completed and interaction created",
+        message: followUpActivityId
+          ? "Activity completed, interaction created, and follow-up added to Agenda"
+          : "Activity completed and interaction created",
         activity: await loadActivity(req.params.activityId),
         interactionId: interaction.rows[0].interaction_id,
+        followUpActivityId,
       });
     } catch (error) {
       await client.query("ROLLBACK").catch(() => {});
