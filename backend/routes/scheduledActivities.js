@@ -5,6 +5,10 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  customerAccessCondition,
+  ensureCustomerAccess,
+} = require("../middleware/customerAccess");
 
 const router = express.Router();
 
@@ -151,23 +155,6 @@ function sendError(res, error) {
         ? error.message || "Internal server error"
         : error.message,
   });
-}
-
-async function ensureCustomer(client, customerId) {
-  const result = await client.query(
-    `SELECT customer_id, assigned_to
-     FROM customers
-     WHERE customer_id = $1`,
-    [customerId]
-  );
-
-  if (result.rowCount === 0) {
-    const error = new Error("Customer not found");
-    error.status = 404;
-    throw error;
-  }
-
-  return result.rows[0];
 }
 
 async function validateContact(client, customerId, contactId) {
@@ -456,6 +443,14 @@ router.get("/", requireAuth, async (req, res) => {
       clauses.push(clause.replace("?", `$${parameters.length}`));
     };
 
+    const access = customerAccessCondition(
+      req.user,
+      "c",
+      parameters.length + 1
+    );
+    parameters.push(...access.parameters);
+    clauses.push(access.clause);
+
     if (nullable(req.query.customerId)) {
       add("sa.customer_id = ?", nullable(req.query.customerId));
     }
@@ -564,7 +559,11 @@ router.post(
       }
 
       validateSchedule({ start, end, reminderAt });
-      const customer = await ensureCustomer(client, customerId);
+      const customer = await ensureCustomerAccess(
+        client,
+        req.user,
+        customerId
+      );
       const contactId = await validateContact(
         client,
         customerId,
@@ -687,7 +686,7 @@ router.put(
       }
 
       validateSchedule({ start, end, reminderAt });
-      await ensureCustomer(client, customerId);
+      await ensureCustomerAccess(client, req.user, customerId);
       const contactId = await validateContact(
         client,
         customerId,

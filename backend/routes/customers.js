@@ -5,6 +5,10 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  customerAccessCondition,
+  requireCustomerAccess,
+} = require("../middleware/customerAccess");
 
 const ACCOUNT_TYPES = new Set([
   "organization",
@@ -246,8 +250,9 @@ router.post(
 router.get(
   "/",
   requireAuth,
-  async (_req, res) => {
+  async (req, res) => {
     try {
+      const access = customerAccessCondition(req.user, "c", 1);
       const result = await pool.query(
         `SELECT
            c.*,
@@ -294,8 +299,10 @@ router.get(
            FROM customer_contacts cc
            WHERE cc.customer_id = c.customer_id
          ) contact_totals ON true
+         WHERE ${access.clause}
          ORDER BY c.created_at DESC
-         LIMIT 100`
+         LIMIT 100`,
+        access.parameters
       );
 
       res.json(result.rows);
@@ -334,6 +341,7 @@ router.get(
 router.get(
   "/:id/assignment-history",
   requireAuth,
+  requireCustomerAccess("id"),
   async (req, res) => {
     try {
       const result = await pool.query(
@@ -454,6 +462,7 @@ router.put(
   "/:id",
   requireAuth,
   requireRole("admin", "manager", "sales"),
+  requireCustomerAccess("id"),
   async (req, res) => {
     try {
       const r = req.body;

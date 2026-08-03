@@ -5,6 +5,11 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  customerAccessCondition,
+  ensureEngineAccess,
+  ensureVesselAccess,
+} = require("../middleware/customerAccess");
 
 router.post(
   "/",
@@ -13,6 +18,7 @@ router.post(
   async (req, res) => {
   try {
     const r = req.body;
+    await ensureVesselAccess(pool, req.user, r.VesselID);
 
     const result = await pool.query(
       `INSERT INTO engines
@@ -63,8 +69,9 @@ router.post(
 router.get(
   "/",
   requireAuth,
-  async (_req, res) => {
+  async (req, res) => {
   try {
+    const access = customerAccessCondition(req.user, "c", 1);
     const result = await pool.query(
       `SELECT
          e.*,
@@ -75,8 +82,10 @@ router.get(
          ON e.vessel_id = v.vessel_id
        LEFT JOIN customers c
          ON v.customer_id = c.customer_id
+       WHERE ${access.clause}
        ORDER BY e.created_at DESC
-       LIMIT 100`
+       LIMIT 100`,
+      access.parameters
     );
 
     res.json(result.rows);
@@ -95,6 +104,8 @@ router.put(
   async (req, res) => {
   try {
     const r = req.body;
+    await ensureEngineAccess(pool, req.user, req.params.id);
+    await ensureVesselAccess(pool, req.user, r.VesselID);
 
     const result = await pool.query(
       `UPDATE engines

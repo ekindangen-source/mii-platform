@@ -5,12 +5,18 @@ const {
   requireAuth,
   requireRole,
 } = require("../middleware/auth");
+const {
+  customerAccessCondition,
+  ensureEngineAccess,
+  ensureMaintenanceAccess,
+} = require("../middleware/customerAccess");
 
 router.get(
   "/",
   requireAuth,
-  async (_req, res) => {
+  async (req, res) => {
   try {
+    const access = customerAccessCondition(req.user, "c", 1);
     const result = await pool.query(
       `SELECT
          m.*,
@@ -26,7 +32,9 @@ router.get(
          ON e.vessel_id = v.vessel_id
        LEFT JOIN customers c
          ON v.customer_id = c.customer_id
-       ORDER BY m.service_date DESC, m.created_at DESC`
+       WHERE ${access.clause}
+       ORDER BY m.service_date DESC, m.created_at DESC`,
+      access.parameters
     );
 
     res.json(result.rows);
@@ -43,6 +51,7 @@ router.get(
   requireAuth,
   async (req, res) => {
   try {
+    await ensureMaintenanceAccess(pool, req.user, req.params.id);
     const result = await pool.query(
       `SELECT *
        FROM maintenance
@@ -73,6 +82,7 @@ router.post(
   async (req, res) => {
   try {
     const r = req.body;
+    await ensureEngineAccess(pool, req.user, r.EngineID);
 
     const result = await pool.query(
       `INSERT INTO maintenance
@@ -134,6 +144,8 @@ router.put(
   async (req, res) => {
   try {
     const r = req.body;
+    await ensureMaintenanceAccess(pool, req.user, req.params.id);
+    await ensureEngineAccess(pool, req.user, r.EngineID);
 
     const result = await pool.query(
       `UPDATE maintenance
