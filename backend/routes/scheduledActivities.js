@@ -155,7 +155,7 @@ function sendError(res, error) {
 
 async function ensureCustomer(client, customerId) {
   const result = await client.query(
-    `SELECT customer_id
+    `SELECT customer_id, assigned_to
      FROM customers
      WHERE customer_id = $1`,
     [customerId]
@@ -166,6 +166,8 @@ async function ensureCustomer(client, customerId) {
     error.status = 404;
     throw error;
   }
+
+  return result.rows[0];
 }
 
 async function validateContact(client, customerId, contactId) {
@@ -194,8 +196,9 @@ async function validateContact(client, customerId, contactId) {
   return contactId;
 }
 
-async function validateAssignee(client, user, assignedTo) {
-  const resolved = nullable(assignedTo) || user.userId;
+async function validateAssignee(client, user, assignedTo, defaultAssignee) {
+  const resolved =
+    nullable(assignedTo) || nullable(defaultAssignee) || user.userId;
 
   if (!isManager(user) && resolved !== user.userId) {
     const error = new Error(
@@ -561,7 +564,7 @@ router.post(
       }
 
       validateSchedule({ start, end, reminderAt });
-      await ensureCustomer(client, customerId);
+      const customer = await ensureCustomer(client, customerId);
       const contactId = await validateContact(
         client,
         customerId,
@@ -570,7 +573,10 @@ router.post(
       const assignedTo = await validateAssignee(
         client,
         req.user,
-        nullable(body.AssignedTo)
+        nullable(body.AssignedTo),
+        isManager(req.user) || customer.assigned_to === req.user.userId
+          ? customer.assigned_to
+          : req.user.userId
       );
 
       const result = await client.query(
@@ -690,7 +696,8 @@ router.put(
       const assignedTo = await validateAssignee(
         client,
         req.user,
-        nullable(body.AssignedTo)
+        nullable(body.AssignedTo),
+        existing.assigned_to
       );
       const reminderChanged =
         String(existing.reminder_at || "") !==
