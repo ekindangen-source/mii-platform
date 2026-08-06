@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularPr
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import GroupsIcon from "@mui/icons-material/Groups";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
@@ -20,7 +21,7 @@ function StatCard({ title, value, subtitle, icon, path, tone = "primary" }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [data, setData] = useState({ customers: [], opportunities: [], summary: {}, agenda: { overdue: [], today: [], upcoming: [] } });
+  const [data, setData] = useState({ customers: [], opportunities: [], summary: {}, leadSummary: {}, agenda: { overdue: [], today: [], upcoming: [] } });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -30,19 +31,23 @@ export default function Dashboard() {
       silent ? setRefreshing(true) : setLoading(true);
       setError("");
       const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-      const [customers, opportunities, summary, agenda] = await Promise.all([
+      const leadRequest = ["admin", "manager", "sales", "viewer"].includes(user?.role)
+        ? api.get("/leads/summary")
+        : Promise.resolve({ data: {} });
+      const [customers, opportunities, summary, leadSummary, agenda] = await Promise.all([
         api.get("/customers"), api.get("/opportunities"), api.get("/opportunities/summary"),
+        leadRequest,
         api.get("/scheduled-activities/agenda", { params: { date, timeZone: "Asia/Jakarta" } }),
       ]);
       setData({
         customers: Array.isArray(customers.data) ? customers.data : [],
         opportunities: Array.isArray(opportunities.data) ? opportunities.data : [],
-        summary: summary.data || {}, agenda: agenda.data || { overdue: [], today: [], upcoming: [] },
+        summary: summary.data || {}, leadSummary: leadSummary.data || {}, agenda: agenda.data || { overdue: [], today: [], upcoming: [] },
       });
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to load CRM dashboard");
     } finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => { load(); }, [load]);
   const openOpportunities = useMemo(() => data.opportunities.filter((item) => !["won", "lost"].includes(item.stage)), [data.opportunities]);
@@ -58,7 +63,8 @@ export default function Dashboard() {
     </Stack>
     {refreshing && <LinearProgress sx={{ mb: 2 }} />}
     {error && <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" onClick={() => load()}>Retry</Button>}>{error}</Alert>}
-    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,1fr)", lg: "repeat(5,1fr)" }, gap: 2, mb: 3 }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,1fr)", lg: "repeat(3,1fr)", xl: "repeat(6,1fr)" }, gap: 2, mb: 3 }}>
+      <StatCard title="Active leads" value={data.leadSummary.active_count || 0} subtitle={`${data.leadSummary.qualified_count || 0} qualified`} icon={<PersonSearchIcon />} path="/leads" tone="info" />
       <StatCard title="Customers" value={data.customers.length} subtitle="Accounts in your portfolio" icon={<GroupsIcon />} path="/customers" />
       <StatCard title="Open opportunities" value={data.summary.open_count || 0} subtitle={formatIdr(data.summary.open_value)} icon={<TrendingUpIcon />} path="/opportunities" tone="info" />
       <StatCard title="Weighted pipeline" value={formatIdr(data.summary.weighted_value)} subtitle="Probability-adjusted forecast" icon={<AccountBalanceWalletIcon />} path="/pipeline" tone="secondary" />

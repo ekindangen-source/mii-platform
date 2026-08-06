@@ -91,6 +91,30 @@ async function validateContact(client, customerId, contactId) {
   return contactId;
 }
 
+async function validateInstalledBase(client, customerId, vesselId, engineId) {
+  let vessel = nullable(vesselId);
+  const engine = nullable(engineId);
+  if (engine) {
+    const result = await client.query(
+      `SELECT e.engine_id, e.vessel_id FROM engines e
+       JOIN vessels v ON v.vessel_id=e.vessel_id
+       WHERE e.engine_id=$1 AND v.customer_id=$2`, [engine, customerId]
+    );
+    if (!result.rowCount) throw Object.assign(new Error("The selected engine does not belong to this customer"), { status: 400 });
+    if (vessel && vessel !== result.rows[0].vessel_id) {
+      throw Object.assign(new Error("The selected engine does not belong to the selected vessel"), { status: 400 });
+    }
+    vessel = vessel || result.rows[0].vessel_id;
+  }
+  if (vessel) {
+    const result = await client.query(
+      `SELECT vessel_id FROM vessels WHERE vessel_id=$1 AND customer_id=$2`, [vessel, customerId]
+    );
+    if (!result.rowCount) throw Object.assign(new Error("The selected vessel does not belong to this customer"), { status: 400 });
+  }
+  return { vesselId: vessel, engineId: engine };
+}
+
 function validatePayload(body, existing = {}) {
   const title = String(body.Title ?? existing.title ?? "").trim();
   const stage = normalizeStage(body.Stage, existing.stage || "prospecting");
@@ -125,6 +149,9 @@ const SELECT_OPPORTUNITY = `
     cc.full_name AS contact_name, cc.job_title AS contact_job_title,
     owner.full_name AS owner_name, owner.email AS owner_email,
     creator.full_name AS created_by_name,
+    v.boat_name AS vessel_name,
+    e.brand AS engine_brand, e.model AS engine_model,
+    e.serial_number AS engine_serial_number,
     (o.estimated_value * o.probability / 100.0) AS weighted_value
   FROM sales_opportunities o
   INNER JOIN customers c ON c.customer_id = o.customer_id
@@ -132,6 +159,8 @@ const SELECT_OPPORTUNITY = `
     ON cc.customer_id = o.customer_id AND cc.contact_id = o.contact_id
   INNER JOIN app_users owner ON owner.user_id = o.owner_id
   LEFT JOIN app_users creator ON creator.user_id = o.created_by
+  LEFT JOIN vessels v ON v.vessel_id=o.vessel_id
+  LEFT JOIN engines e ON e.engine_id=o.engine_id
 `;
 
 function visibility(user, startIndex = 1) {
@@ -156,6 +185,31 @@ router.get("/owners", requireAuth, requireRole(...READ_ROLES), async (_req, res)
   } catch (error) {
     return sendError(res, error);
   }
+});
+
+router.get("/customer/:customerId/installed-base", requireAuth, requireRole(...READ_ROLES), async (req, res) => {
+  try {
+    await ensureCustomerAccess(pool, req.user, req.params.customerId);
+    const result = await pool.query(
+      `SELECT v.vessel_id, v.boat_name, v.builder, v.year_built,
+        e.engine_id, e.brand, e.model, e.hp, e.serial_number
+       FROM vessels v LEFT JOIN engines e ON e.vessel_id=v.vessel_id
+       WHERE v.customer_id=$1 ORDER BY v.boat_name, e.brand, e.model`,
+      [req.params.customerId]
+    );
+    const vessels = [];
+    for (const row of result.rows) {
+      let vessel = vessels.find((item) => item.vessel_id === row.vessel_id);
+      if (!vessel) {
+        vessel = { vessel_id: row.vessel_id, boat_name: row.boat_name,
+          builder: row.builder, year_built: row.year_built, engines: [] };
+        vessels.push(vessel);
+      }
+      if (row.engine_id) vessel.engines.push({ engine_id: row.engine_id, brand: row.brand,
+        model: row.model, hp: row.hp, serial_number: row.serial_number });
+    }
+    return res.json(vessels);
+  } catch (error) { return sendError(res, error); }
 });
 
 router.get("/summary", requireAuth, requireRole(...READ_ROLES), async (req, res) => {
@@ -235,19 +289,23 @@ router.post("/", requireAuth, requireRole(...WRITE_ROLES), async (req, res) => {
       nullable(body.ContactID)
     );
     const ownerId = await validateOwner(client, req.user, body.OwnerID);
+    const installedBase = await validateInstalledBase(
+      client, customerId, body.VesselID, body.EngineID
+    );
     const result = await client.query(
       `INSERT INTO sales_opportunities (
          customer_id, contact_id, owner_id, title, product_interest,
          description, stage, estimated_value, probability, expected_close_date,
          next_action, next_action_at, competitor, loss_reason, closed_at,
-         created_by, updated_by
+         created_by, updated_by, vessel_id, engine_id
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-         CASE WHEN $7 IN ('won','lost') THEN NOW() ELSE NULL END,$15,$15)
+         CASE WHEN $7 IN ('won','lost') THEN NOW() ELSE NULL END,$15,$15,$16,$17)
        RETURNING opportunity_id`,
       [customerId, contactId, ownerId, values.title, nullable(body.ProductInterest),
        nullable(body.Description), values.stage, values.estimatedValue, values.probability,
        nullable(body.ExpectedCloseDate), values.nextAction, values.nextActionAt,
-       nullable(body.Competitor), values.lossReason, req.user.userId]
+       nullable(body.Competitor), values.lossReason, req.user.userId,
+       installedBase.vesselId, installedBase.engineId]
     );
     await client.query("COMMIT");
     const created = await pool.query(`${SELECT_OPPORTUNITY} WHERE o.opportunity_id = $1`, [result.rows[0].opportunity_id]);
@@ -281,6 +339,11 @@ router.put("/:id", requireAuth, requireRole(...WRITE_ROLES), async (req, res) =>
       : nullable(body.ContactID);
     const contactId = await validateContact(client, customerId, requestedContact);
     const ownerId = await validateOwner(client, req.user, body.OwnerID || current.rows[0].owner_id);
+    const installedBase = await validateInstalledBase(
+      client, customerId,
+      body.VesselID === undefined ? current.rows[0].vessel_id : body.VesselID,
+      body.EngineID === undefined ? current.rows[0].engine_id : body.EngineID
+    );
     await client.query(
       `UPDATE sales_opportunities SET
          customer_id=$2, contact_id=$3, owner_id=$4, title=$5,
@@ -290,13 +353,14 @@ router.put("/:id", requireAuth, requireRole(...WRITE_ROLES), async (req, res) =>
          closed_at=CASE
            WHEN $8 IN ('won','lost') AND stage NOT IN ('won','lost') THEN NOW()
            WHEN $8 NOT IN ('won','lost') THEN NULL ELSE closed_at END,
-         updated_by=$16, updated_at=NOW()
+         updated_by=$16, vessel_id=$17, engine_id=$18, updated_at=NOW()
        WHERE opportunity_id=$1`,
       [req.params.id, customerId, contactId, ownerId, values.title,
        nullable(body.ProductInterest), nullable(body.Description), values.stage,
        values.estimatedValue, values.probability, nullable(body.ExpectedCloseDate),
        values.nextAction, values.nextActionAt, nullable(body.Competitor),
-       values.lossReason, req.user.userId]
+       values.lossReason, req.user.userId, installedBase.vesselId,
+       installedBase.engineId]
     );
     await client.query("COMMIT");
     const updated = await pool.query(`${SELECT_OPPORTUNITY} WHERE o.opportunity_id = $1`, [req.params.id]);
