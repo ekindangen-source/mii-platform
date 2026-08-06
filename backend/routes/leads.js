@@ -173,12 +173,22 @@ router.post("/:id/convert", requireAuth, requireRole(...WRITE_ROLES), async (req
     if (!found.rowCount) throw Object.assign(new Error("Lead not found"), { status: 404 });
     const lead = found.rows[0];
     if (lead.status !== "qualified") throw Object.assign(new Error("Only a qualified lead can be converted"), { status: 409 });
+    if (req.body?.SaleConfirmed !== true) {
+      throw Object.assign(new Error("A confirmed sale is required before a Lead can become a Customer"), { status: 409 });
+    }
+    const opportunityTitle = String(
+      req.body?.OpportunityTitle || lead.product_interest || `Sale - ${lead.name}`
+    ).trim();
+    if (!opportunityTitle) {
+      throw Object.assign(new Error("Won opportunity title is required"), { status: 400 });
+    }
     const customer = await client.query(`INSERT INTO customers (
       account_type,company,industry,contact_person,position,province,email,telephone,address,
-      notes,lead_source,created_by,assigned_to
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      notes,lead_source,created_by,assigned_to,origin_lead_id,creation_method
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'lead_conversion') RETURNING *`,
       [lead.account_type,lead.name,lead.industry,lead.contact_name,lead.contact_title,lead.province,
-       lead.contact_email,lead.contact_phone,lead.address,lead.notes,lead.source,req.user.userId,lead.owner_id]);
+       lead.contact_email,lead.contact_phone,lead.address,lead.notes,lead.source,req.user.userId,
+       lead.owner_id,lead.lead_id]);
     const customerId = customer.rows[0].customer_id;
     await client.query(`INSERT INTO customer_assignment_history
       (customer_id,previous_assigned_to,assigned_to,changed_by,reason)
@@ -187,17 +197,16 @@ router.post("/:id/convert", requireAuth, requireRole(...WRITE_ROLES), async (req
       customer_id,full_name,job_title,telephone,email,is_primary,is_active,created_by,updated_by
     ) VALUES ($1,$2,$3,$4,$5,true,true,$6,$6) RETURNING *`,
       [customerId,lead.contact_name,lead.contact_title,lead.contact_phone,lead.contact_email,req.user.userId]);
-    let opportunityId = null;
-    if (req.body?.CreateOpportunity) {
-      const title = String(req.body.OpportunityTitle || lead.product_interest || `Opportunity - ${lead.name}`).trim();
-      const opportunity = await client.query(`INSERT INTO sales_opportunities (
-        customer_id,contact_id,owner_id,title,product_interest,description,stage,
-        estimated_value,probability,expected_close_date,next_action,next_action_at,created_by,updated_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,'qualified',$7,25,$8,$9,$10,$11,$11) RETURNING opportunity_id`,
-        [customerId,contact.rows[0].contact_id,lead.owner_id,title,lead.product_interest,lead.notes,
-         lead.estimated_value,nullable(req.body.ExpectedCloseDate),lead.next_action,lead.next_action_at,req.user.userId]);
-      opportunityId = opportunity.rows[0].opportunity_id;
-    }
+    const opportunity = await client.query(`INSERT INTO sales_opportunities (
+      customer_id,contact_id,owner_id,title,product_interest,description,stage,
+      estimated_value,probability,expected_close_date,next_action,next_action_at,
+      closed_at,created_by,updated_by
+    ) VALUES ($1,$2,$3,$4,$5,$6,'won',$7,100,$8,NULL,NULL,NOW(),$9,$9)
+    RETURNING opportunity_id`,
+      [customerId,contact.rows[0].contact_id,lead.owner_id,opportunityTitle,
+       lead.product_interest,lead.notes,lead.estimated_value,
+       nullable(req.body?.ExpectedCloseDate),req.user.userId]);
+    const opportunityId = opportunity.rows[0].opportunity_id;
     await client.query(`UPDATE crm_leads SET status='converted',converted_customer_id=$2,
       converted_opportunity_id=$3,converted_at=NOW(),updated_by=$4,updated_at=NOW()
       WHERE lead_id=$1`, [lead.lead_id,customerId,opportunityId,req.user.userId]);

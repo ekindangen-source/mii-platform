@@ -7,7 +7,7 @@ import api from "../services/api";
 import { dateInputToIsoDate } from "../utils/dateTime";
 
 export default function ConvertLeadDialog({ open, lead, onClose, onConverted }) {
-  const [createOpportunity, setCreateOpportunity] = useState(true);
+  const [saleConfirmed, setSaleConfirmed] = useState(false);
   const [title, setTitle] = useState("");
   const [closeDate, setCloseDate] = useState("");
   const [saving, setSaving] = useState(false);
@@ -15,8 +15,8 @@ export default function ConvertLeadDialog({ open, lead, onClose, onConverted }) 
 
   useEffect(() => {
     if (!open || !lead) return;
-    setCreateOpportunity(true);
-    setTitle(lead.product_interest || `Opportunity - ${lead.name}`);
+    setSaleConfirmed(false);
+    setTitle(lead.product_interest || `Sale - ${lead.name}`);
     setCloseDate("");
     setError("");
   }, [open, lead]);
@@ -30,7 +30,7 @@ export default function ConvertLeadDialog({ open, lead, onClose, onConverted }) 
         throw new Error("Expected close date must use DD/MM/YYYY");
       }
       await api.post(`/leads/${encodeURIComponent(lead.lead_id)}/convert`, {
-        CreateOpportunity: createOpportunity,
+        SaleConfirmed: saleConfirmed,
         OpportunityTitle: title,
         ExpectedCloseDate: expectedCloseDate,
       });
@@ -43,19 +43,17 @@ export default function ConvertLeadDialog({ open, lead, onClose, onConverted }) 
   }
 
   return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
-    <DialogTitle>Convert qualified lead</DialogTitle>
+    <DialogTitle>Confirm sale and create customer</DialogTitle>
     <DialogContent dividers><Stack gap={2}>
       {error && <Alert severity="error">{error}</Alert>}
-      <Typography>Convert <strong>{lead?.name}</strong> into a Customer and primary PIC. This is transactional and the lead cannot be converted twice.</Typography>
-      <FormControlLabel control={<Checkbox checked={createOpportunity} onChange={(event) => setCreateOpportunity(event.target.checked)} />} label="Create the first opportunity" />
-      {createOpportunity && <>
-        <TextField required label="Opportunity title" value={title} onChange={(event) => setTitle(event.target.value)} />
-        <TextField label="Expected close date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} placeholder="DD/MM/YYYY" helperText="Example: 31/12/2026" />
-      </>}
+      <Typography>A Customer is created only after a sale is confirmed. This creates the Customer, primary PIC, ownership history, and a Won opportunity in one transaction.</Typography>
+      <TextField required label="Won opportunity / sale" value={title} onChange={(event) => setTitle(event.target.value)} />
+      <TextField label="Expected close date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} placeholder="DD/MM/YYYY" helperText="Example: 31/12/2026" />
+      <FormControlLabel control={<Checkbox checked={saleConfirmed} onChange={(event) => setSaleConfirmed(event.target.checked)} />} label={<>I confirm that <strong>{lead?.name}</strong> has completed a sale and should become a Customer.</>} />
     </Stack></DialogContent>
     <DialogActions>
       <Button onClick={onClose} disabled={saving}>Cancel</Button>
-      <Button variant="contained" onClick={convert} disabled={saving || (createOpportunity && !title.trim())}>{saving ? "Converting..." : "Convert lead"}</Button>
+      <Button variant="contained" onClick={convert} disabled={saving || !saleConfirmed || !title.trim()}>{saving ? "Creating customer..." : "Confirm sale"}</Button>
     </DialogActions>
   </Dialog>;
 }

@@ -8,13 +8,14 @@ It is not intended to dispatch or operate customer fleets.
 
 ## Core flow
 
-1. Create a customer and its initial PIC.
-2. Assign the customer to the responsible salesperson.
-3. Log calls, WhatsApp messages, emails, meetings, and visits.
-4. Create an opportunity when a commercial requirement is identified.
-5. Record estimated value, stage, probability, expected close date, and next action.
-6. Use Agenda for planned customer activities and Pipeline for commercial progression.
-7. Close an opportunity as Won or Lost and preserve the outcome.
+1. Create a Lead with its initial PIC and responsible salesperson.
+2. Record product interest, expected value, next action, and qualification progress.
+3. Mark the Lead Qualified when the commercial requirement is credible.
+4. Confirm the sale only after customer commitment is secured.
+5. The system transactionally creates the Customer, primary PIC, ownership history,
+   and Won Opportunity while preserving the converted Lead as audit history.
+6. Manage later interactions, Agenda activities, installed base, and repeat
+   Opportunities from the Customer account.
 
 ## Opportunity stages
 

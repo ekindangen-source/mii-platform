@@ -313,15 +313,6 @@ export default function Customers() {
     setOrderBy(columnId);
   }
 
-  function openCreateDialog() {
-    setEditingId(null);
-    setForm({
-      ...emptyForm,
-      AssignedTo: user?.userId || "",
-    });
-    setFormOpen(true);
-  }
-
   function openEditDialog(customer) {
     setEditingId(customer.customer_id);
     setForm(mapRowToForm(customer));
@@ -350,18 +341,13 @@ export default function Customers() {
   async function handleSubmit(event) {
     event.preventDefault();
 
+    if (!editingId) {
+      setError("Customers can only be created from a confirmed Lead sale");
+      return;
+    }
+
     if (!form.Company.trim()) {
       setError("Company is required");
-      return;
-    }
-
-    if (!editingId && !form.InitialPICName.trim()) {
-      setError("Initial PIC name is required");
-      return;
-    }
-
-    if (!editingId && !form.InitialPICPhone.trim()) {
-      setError("Initial PIC phone number is required");
       return;
     }
 
@@ -382,23 +368,11 @@ export default function Customers() {
             : Number(form.AnnualOperatingHours),
       };
 
-      if (editingId) {
-        await api.put(
-          `/customers/${encodeURIComponent(editingId)}`,
-          payload
-        );
-        setSuccess("Customer updated successfully");
-      } else {
-        const response = await api.post("/customers", payload);
-        const generatedId =
-          response.data?.customer?.customer_id;
-
-        setSuccess(
-          generatedId
-            ? `Customer ${generatedId} created successfully`
-            : "Customer created successfully"
-        );
-      }
+      await api.put(
+        `/customers/${encodeURIComponent(editingId)}`,
+        payload
+      );
+      setSuccess("Customer updated successfully");
 
       closeFormDialog();
       await loadCustomers();
@@ -762,20 +736,10 @@ export default function Customers() {
           </Typography>
 
           <Typography color="text.secondary">
-            Manage customer accounts, PICs, and fleet
-            information.
+            Customers created from confirmed Lead sales. Manage PICs and installed base information here.
           </Typography>
         </Box>
 
-        {canWrite && (
-          <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={openCreateDialog}
-                  >
-                    Add customer
-                  </Button>
-        )}
       </Stack>
 
       {error && (
@@ -1169,11 +1133,7 @@ export default function Customers() {
           component="form"
           onSubmit={handleSubmit}
         >
-          <DialogTitle>
-            {editingId
-              ? "Edit customer"
-              : "Add customer"}
-          </DialogTitle>
+          <DialogTitle>Edit customer</DialogTitle>
 
           <DialogContent dividers>
             <Box
@@ -1360,11 +1320,7 @@ export default function Customers() {
               variant="contained"
               disabled={saving}
             >
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update customer"
-                  : "Create customer"}
+              {saving ? "Saving..." : "Update customer"}
             </Button>
           </DialogActions>
         </Box>

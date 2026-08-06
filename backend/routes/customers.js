@@ -65,11 +65,23 @@ async function validateActiveAssignee(client, assignedTo) {
   return assignedTo;
 }
 
-// CREATE CUSTOMER ACCOUNT
+// Customers normally originate from a confirmed-sale Lead conversion.
 router.post(
   "/",
   requireAuth,
   requireRole("admin", "manager", "sales"),
+  (_req, res) => res.status(409).json({
+    status: "ERROR",
+    message:
+      "Customers can only be created by confirming a sale from a qualified Lead. Use the admin import endpoint only for exceptional historical imports.",
+  })
+);
+
+// EXCEPTIONAL ADMIN-ONLY HISTORICAL IMPORT
+router.post(
+  "/admin-import",
+  requireAuth,
+  requireRole("admin"),
   async (req, res) => {
     const client = await pool.connect();
 
@@ -88,6 +100,14 @@ router.post(
         r.InitialPICPhone || ""
       ).trim();
       const requestedAssignee = nullable(r.AssignedTo);
+      const importReason = String(r.ImportReason || "").trim();
+
+      if (!importReason) {
+        return res.status(400).json({
+          status: "ERROR",
+          message: "Import reason is required for an admin customer import",
+        });
+      }
 
       if (
         requestedAssignee &&
@@ -156,12 +176,13 @@ router.post(
           notes,
           lead_source,
           created_by,
-          assigned_to
+          assigned_to,
+          creation_method
         )
         VALUES
         (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,
-          $10,$11,$12,$13,$14,$15,$16,$17,$18
+          $10,$11,$12,$13,$14,$15,$16,$17,$18,$19
         )
         RETURNING *`,
         [
@@ -183,6 +204,7 @@ router.post(
           nullable(r.Source),
           req.user.userId,
           assignedTo,
+          "admin_import",
         ]
       );
 
@@ -200,7 +222,7 @@ router.post(
           result.rows[0].customer_id,
           assignedTo,
           req.user.userId,
-          "Customer created",
+          `Admin import: ${importReason}`,
         ]
       );
 

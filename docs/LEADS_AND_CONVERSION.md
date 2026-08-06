@@ -4,10 +4,17 @@ Leads are prospects that have not yet purchased. Customers are established
 accounts. A lead moves through New, Contacted, Qualified, and then either
 Converted or Disqualified.
 
-Only a Qualified lead can be converted. Conversion runs in one database
-transaction and creates the Customer, primary PIC, assignment history, and—if
-selected—the first Opportunity. The original Lead remains as immutable
+CRM leads are stored in `crm_leads`, separate from the legacy Mobile Sales
+module's `sales_leads` data.
+
+Only a Qualified lead with an explicitly confirmed sale can be converted.
+Conversion runs in one database transaction and creates the Customer, primary
+PIC, assignment history, and mandatory Won Opportunity. The original Lead remains as immutable
 conversion history and cannot be converted twice or deleted afterward.
+
+Normal direct Customer creation is disabled in both the user interface and API.
+Exceptional historical imports are restricted to administrators, require an
+import reason, and are recorded separately from Lead conversions.
 
 Sales users see their own leads. Administrators, managers, and viewers see all
 leads; only administrators and managers can delete non-converted leads or
