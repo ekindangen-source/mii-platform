@@ -74,7 +74,7 @@ function payload(body, existing = {}) {
 
 const SELECT = `SELECT l.*, owner.full_name AS owner_name,
   c.company AS converted_customer_name
-  FROM sales_leads l
+  FROM crm_leads l
   JOIN app_users owner ON owner.user_id=l.owner_id
   LEFT JOIN customers c ON c.customer_id=l.converted_customer_id`;
 
@@ -94,7 +94,7 @@ router.get("/summary", requireAuth, requireRole(...READ_ROLES), async (req, res)
       COUNT(*) FILTER (WHERE status='qualified')::integer AS qualified_count,
       COUNT(*) FILTER (WHERE status='converted')::integer AS converted_count,
       COUNT(*) FILTER (WHERE status NOT IN ('converted','disqualified') AND next_action_at<NOW())::integer AS overdue_actions
-      FROM sales_leads l WHERE ${visible.clause}`, visible.parameters);
+      FROM crm_leads l WHERE ${visible.clause}`, visible.parameters);
     res.json(result.rows[0]);
   } catch (error) { sendError(res, error); }
 });
@@ -123,7 +123,7 @@ router.post("/", requireAuth, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
     const value = payload(req.body || {});
     const owner = await ownerId(client, req.user, req.body?.OwnerID);
-    const result = await client.query(`INSERT INTO sales_leads (
+    const result = await client.query(`INSERT INTO crm_leads (
       account_type,name,contact_name,contact_title,contact_phone,contact_email,
       industry,province,address,source,product_interest,estimated_value,status,
       owner_id,next_action,next_action_at,notes,disqualified_reason,created_by,updated_by
@@ -142,13 +142,13 @@ router.put("/:id", requireAuth, requireRole(...WRITE_ROLES), async (req, res) =>
   try {
     await client.query("BEGIN");
     const visible = visibility(req.user, 2);
-    const current = await client.query(`SELECT l.* FROM sales_leads l WHERE l.lead_id=$1
+    const current = await client.query(`SELECT l.* FROM crm_leads l WHERE l.lead_id=$1
       AND ${visible.clause} FOR UPDATE`, [req.params.id, ...visible.parameters]);
     if (!current.rowCount) throw Object.assign(new Error("Lead not found"), { status: 404 });
     if (current.rows[0].status === "converted") throw Object.assign(new Error("Converted leads cannot be edited"), { status: 409 });
     const value = payload(req.body || {}, current.rows[0]);
     const owner = await ownerId(client, req.user, req.body?.OwnerID || current.rows[0].owner_id);
-    await client.query(`UPDATE sales_leads SET account_type=$2,name=$3,contact_name=$4,
+    await client.query(`UPDATE crm_leads SET account_type=$2,name=$3,contact_name=$4,
       contact_title=$5,contact_phone=$6,contact_email=$7,industry=$8,province=$9,address=$10,
       source=$11,product_interest=$12,estimated_value=$13,status=$14,owner_id=$15,
       next_action=$16,next_action_at=$17,notes=$18,disqualified_reason=$19,
@@ -168,7 +168,7 @@ router.post("/:id/convert", requireAuth, requireRole(...WRITE_ROLES), async (req
   try {
     await client.query("BEGIN");
     const visible = visibility(req.user, 2);
-    const found = await client.query(`SELECT l.* FROM sales_leads l WHERE lead_id=$1
+    const found = await client.query(`SELECT l.* FROM crm_leads l WHERE lead_id=$1
       AND ${visible.clause} FOR UPDATE`, [req.params.id, ...visible.parameters]);
     if (!found.rowCount) throw Object.assign(new Error("Lead not found"), { status: 404 });
     const lead = found.rows[0];
@@ -198,7 +198,7 @@ router.post("/:id/convert", requireAuth, requireRole(...WRITE_ROLES), async (req
          lead.estimated_value,nullable(req.body.ExpectedCloseDate),lead.next_action,lead.next_action_at,req.user.userId]);
       opportunityId = opportunity.rows[0].opportunity_id;
     }
-    await client.query(`UPDATE sales_leads SET status='converted',converted_customer_id=$2,
+    await client.query(`UPDATE crm_leads SET status='converted',converted_customer_id=$2,
       converted_opportunity_id=$3,converted_at=NOW(),updated_by=$4,updated_at=NOW()
       WHERE lead_id=$1`, [lead.lead_id,customerId,opportunityId,req.user.userId]);
     await client.query("COMMIT");
@@ -209,7 +209,7 @@ router.post("/:id/convert", requireAuth, requireRole(...WRITE_ROLES), async (req
 
 router.delete("/:id", requireAuth, requireRole("admin", "manager"), async (req, res) => {
   try {
-    const result = await pool.query(`DELETE FROM sales_leads WHERE lead_id=$1 AND status<>'converted' RETURNING lead_id`, [req.params.id]);
+    const result = await pool.query(`DELETE FROM crm_leads WHERE lead_id=$1 AND status<>'converted' RETURNING lead_id`, [req.params.id]);
     if (!result.rowCount) return res.status(409).json({ status: "ERROR", message: "Converted leads cannot be deleted" });
     res.json({ status: "OK", message: "Lead deleted" });
   } catch (error) { sendError(res, error); }
