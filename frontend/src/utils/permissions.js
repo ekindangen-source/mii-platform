@@ -1,4 +1,8 @@
 const permissionMatrix = {
+  leads: {
+    write: new Set(["admin", "manager", "sales"]),
+    delete: new Set(["admin", "manager"]),
+  },
   opportunities: {
     write: new Set(["admin", "manager", "sales"]),
     delete: new Set(["admin", "manager"]),

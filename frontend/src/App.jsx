@@ -15,6 +15,7 @@ import Login from "./pages/Login";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
+import Leads from "./pages/Leads";
 import Vessels from "./pages/Vessels";
 import Engines from "./pages/Engines";
 import Trips from "./pages/Trips";
@@ -63,6 +64,10 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route
+          path="/leads"
+          element={<Leads />}
+        />
         <Route
           path="/customers"
           element={<Customers />}

@@ -17,6 +17,7 @@ import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
 import EngineeringIcon from "@mui/icons-material/Engineering";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import SettingsIcon from "@mui/icons-material/Settings";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
@@ -43,6 +44,12 @@ const navigationGroups = [
   {
     label: "Sales CRM",
     items: [
+      {
+        label: "Leads",
+        path: "/leads",
+        icon: <PersonSearchIcon />,
+        allowedRoles: ["admin", "manager", "sales", "viewer"],
+      },
       {
         label: "Customers",
         path: "/customers",

@@ -112,6 +112,11 @@ app.use(
   require("./routes/scheduledActivities.js")
 );
 app.use(
+  "/leads",
+  requireAuth,
+  require("./routes/leads.js")
+);
+app.use(
   "/opportunities",
   requireAuth,
   require("./routes/opportunities.js")
