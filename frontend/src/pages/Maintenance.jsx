@@ -598,10 +598,10 @@ export default function Maintenance() {
       }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            Maintenance
+            Service History
           </Typography>
           <Typography color="text.secondary">
-            Record service work, costs, downtime, and the next service due.
+            Keep customer service records that support account planning and future opportunities.
           </Typography>
         </Box>
 

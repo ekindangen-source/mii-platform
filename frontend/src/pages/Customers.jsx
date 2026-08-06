@@ -37,6 +37,8 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import HistoryIcon from "@mui/icons-material/History";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import { useNavigate } from "react-router-dom";
 
 import api from "../services/api";
 import useMasterData from "../hooks/useMasterData";
@@ -144,6 +146,7 @@ function compareValues(left, right, numeric = false) {
 }
 
 export default function Customers() {
+  const navigate = useNavigate();
   const { valuesByCategory } = useMasterData([
     "customer_source",
   ]);
@@ -158,6 +161,7 @@ export default function Customers() {
     "customers"
   );
   const canAssign = ["admin", "manager"].includes(user?.role);
+  const canViewOpportunities = ["admin", "manager", "sales", "technician", "viewer"].includes(user?.role);
 
   const [customers, setCustomers] = useState([]);
   const [assignees, setAssignees] = useState([]);
@@ -476,6 +480,14 @@ export default function Customers() {
     if (customer) {
       setSelectedCustomer(null);
       setContactsCustomer(customer);
+    }
+  }
+
+  function handleOpportunitiesFromMenu() {
+    const customer = actionCustomer;
+    closeActionMenu();
+    if (customer) {
+      navigate(`/opportunities?customerId=${encodeURIComponent(customer.customer_id)}`);
     }
   }
 
@@ -1060,6 +1072,13 @@ export default function Customers() {
           />
           Contacts / PICs
         </MenuItem>
+
+        {canViewOpportunities && (
+          <MenuItem onClick={handleOpportunitiesFromMenu}>
+            <TrendingUpIcon fontSize="small" sx={{ mr: 1.25 }} />
+            Opportunities
+          </MenuItem>
+        )}
 
         <MenuItem onClick={handleHistoryFromMenu}>
           <HistoryIcon
