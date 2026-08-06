@@ -20,6 +20,8 @@ import Engines from "./pages/Engines";
 import Trips from "./pages/Trips";
 import Maintenance from "./pages/Maintenance";
 import Agenda from "./pages/Agenda";
+import Opportunities from "./pages/Opportunities";
+import Pipeline from "./pages/Pipeline";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 
@@ -85,6 +87,8 @@ function AppRoutes() {
           path="/agenda"
           element={<Agenda />}
         />
+        <Route path="/opportunities" element={<Opportunities />} />
+        <Route path="/pipeline" element={<Pipeline />} />
         <Route
           path="/users"
           element={

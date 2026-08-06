@@ -635,11 +635,11 @@ export default function Engines() {
             variant="h4"
             sx={{ fontWeight: 700 }}
           >
-            Engines
+            Installed Engines
           </Typography>
 
           <Typography color="text.secondary">
-            Manage engines and their assigned vessels.
+            Track installed equipment, vessel relationships, and customer sales context.
           </Typography>
         </Box>
 

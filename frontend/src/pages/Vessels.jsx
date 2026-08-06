@@ -909,11 +909,11 @@ export default function Vessels() {
             variant="h4"
             sx={{ fontWeight: 700 }}
           >
-            Vessels
+            Installed Vessels
           </Typography>
 
           <Typography color="text.secondary">
-            Manage vessels and customer fleet assignments.
+            Record customer assets as installed-base intelligence for sales and service follow-up.
           </Typography>
         </Box>
 

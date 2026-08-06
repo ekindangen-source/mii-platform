@@ -17,8 +17,9 @@ import DirectionsBoatIcon from "@mui/icons-material/DirectionsBoat";
 import EngineeringIcon from "@mui/icons-material/Engineering";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
-import RouteIcon from "@mui/icons-material/Route";
 import SettingsIcon from "@mui/icons-material/Settings";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import ViewKanbanIcon from "@mui/icons-material/ViewKanban";
 
 import { NavLink } from "react-router-dom";
 
@@ -40,7 +41,7 @@ const navigationGroups = [
     ],
   },
   {
-    label: "Fleet",
+    label: "Sales CRM",
     items: [
       {
         label: "Customers",
@@ -48,32 +49,31 @@ const navigationGroups = [
         icon: <GroupsIcon />,
       },
       {
-        label: "Vessels",
-        path: "/vessels",
-        icon: <DirectionsBoatIcon />,
+        label: "Opportunities",
+        path: "/opportunities",
+        icon: <TrendingUpIcon />,
+        allowedRoles: ["admin", "manager", "sales", "technician", "viewer"],
       },
       {
-        label: "Engines",
-        path: "/engines",
-        icon: <EngineeringIcon />,
+        label: "Pipeline",
+        path: "/pipeline",
+        icon: <ViewKanbanIcon />,
+        allowedRoles: ["admin", "manager", "sales", "technician", "viewer"],
       },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
       {
         label: "Agenda",
         path: "/agenda",
         icon: <CalendarMonthIcon />,
       },
+    ],
+  },
+  {
+    label: "Customer Intelligence",
+    items: [
+      { label: "Installed Vessels", path: "/vessels", icon: <DirectionsBoatIcon /> },
+      { label: "Installed Engines", path: "/engines", icon: <EngineeringIcon /> },
       {
-        label: "Trips",
-        path: "/trips",
-        icon: <RouteIcon />,
-      },
-      {
-        label: "Maintenance",
+        label: "Service History",
         path: "/maintenance",
         icon: <BuildIcon />,
       },
@@ -165,7 +165,7 @@ export default function Sidebar({ onNavigate }) {
               variant="caption"
               sx={{ color: "rgba(255,255,255,0.58)" }}
             >
-              Marine Intelligence
+              Sales CRM
             </Typography>
           </Box>
         </Stack>
@@ -212,8 +212,8 @@ export default function Sidebar({ onNavigate }) {
               {group.items
                 .filter(
                   (item) =>
-                    !item.adminOnly ||
-                    user?.role === "admin"
+                    (!item.adminOnly || user?.role === "admin") &&
+                    (!item.allowedRoles || item.allowedRoles.includes(user?.role))
                 )
                 .map((item) => {
                   const commonSx = {
